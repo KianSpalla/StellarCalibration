@@ -125,8 +125,8 @@ zenith_icrs = zenith_altaz.icrs
 
 # print("\n=== Zenith ===")
 # print("Time (UTC):", t.isot)
-# print("Zenith RA :", zenith_icrs.ra.to_string(unit=u.hour, sep=":")
-# print("Zenith Dec:", zenith_icrs.dec.to_string(unit=u.deg, sep=":")
+# print("Zenith RA :", zenith_icrs.ra.to_string(unit=u.hour, sep=":"))
+# print("Zenith Dec:", zenith_icrs.dec.to_string(unit=u.deg, sep=":"))
 # print("============\n")
 
 
@@ -153,7 +153,7 @@ zenith_icrs = zenith_altaz.icrs
 # 4. Print how many stars you got.
 #
 radius_deg = 60.0   # start smaller than 90
-Gmax = 5        # start bright
+Gmax = 2       # start bright
 
 # # Protect yourself with a row limit
 Gaia.ROW_LIMIT = 200000
