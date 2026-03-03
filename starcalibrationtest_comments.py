@@ -35,7 +35,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from PIL import Image, ImageTk
 
-from stellarcalibrationbackend import run_calibration
+from starcalibrationbackend import run_calibration
 
 # ─── Palette ─────────────────────────────────────────────────────────────────
 BG       = "#0d1117"

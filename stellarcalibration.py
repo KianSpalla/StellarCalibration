@@ -110,7 +110,7 @@ class StarCalibrationApp:
 
         tk.Label(
             hdr,
-            text="Zenith-centre a GONet all-sky image using the Gaia star catalogue",
+            text="Calibrate a GONet all-sky image using the Gaia star catalogue",
             font=("Segoe UI", 9), bg=SURFACE, fg=FG_DIM,
         ).pack(pady=(4, 0))
 
@@ -160,6 +160,45 @@ class StarCalibrationApp:
             font=FONT, text="No image selected",
         )
         self.thumb_label.place(relx=0.5, rely=0.5, anchor="center")
+
+        # ── Detection parameters ─────────────────────────────────────────────
+        params_row = tk.Frame(body, bg=BG)
+        params_row.pack(fill="x", pady=(0, 14))
+
+        tk.Label(params_row, text="Detection threshold (N σ):",
+                 font=FONT, bg=BG, fg=FG_DIM).pack(side="left")
+        self.n_var = tk.DoubleVar(value=5.0)
+        tk.Spinbox(
+            params_row, from_=1.0, to=20.0, increment=0.5,
+            textvariable=self.n_var, width=5,
+            font=FONT, bg=SURFACE, fg=FG,
+            buttonbackground=BORDER, relief="flat",
+            insertbackground=FG,
+        ).pack(side="left", padx=(4, 20))
+
+        tk.Label(params_row, text="Gaia mag limit:",
+                 font=FONT, bg=BG, fg=FG_DIM).pack(side="left")
+        self.gmax_var = tk.DoubleVar(value=2.5)
+        tk.Spinbox(
+            params_row, from_=1.0, to=8.0, increment=0.5,
+            textvariable=self.gmax_var, width=5,
+            font=FONT, bg=SURFACE, fg=FG,
+            buttonbackground=BORDER, relief="flat",
+            insertbackground=FG,
+        ).pack(side="left", padx=(4, 0))
+
+        # ── Options row ───────────────────────────────────────────────────
+        opts_row = tk.Frame(body, bg=BG)
+        opts_row.pack(fill="x", pady=(0, 6))
+
+        self.show_plots_var = tk.BooleanVar(value=False)
+        tk.Checkbutton(
+            opts_row, text="Show diagnostic plots after run",
+            variable=self.show_plots_var,
+            font=FONT, bg=BG, fg=FG_DIM,
+            activebackground=BG, activeforeground=FG,
+            selectcolor=SURFACE,
+        ).pack(side="left")
 
         self.run_btn = HoverButton(
             body, bg_normal=ACCENT, bg_hover=ACCENT_H,
@@ -220,14 +259,24 @@ class StarCalibrationApp:
             lbl.pack(side="left")
             self.result_labels[key] = lbl
 
+        btn_row = tk.Frame(self.results_outer, bg=BG)
+        btn_row.pack(fill="x", pady=(10, 0))
+
+        HoverButton(
+            btn_row, bg_normal=SURFACE, bg_hover=BORDER,
+            text="★  View Matched Stars",
+            font=FONT_SB, padx=16, pady=7,
+            command=self._open_matched_stars,
+        ).pack(side="left")
+
         self.save_btn = HoverButton(
-            self.results_outer,
+            btn_row,
             bg_normal=SURFACE, bg_hover=BORDER,
             text="⬇  Save Shifted Image",
             font=FONT_SB, padx=16, pady=7,
             command=self._save_shifted_image,
         )
-        self.save_btn.pack(pady=(10, 0), anchor="e")
+        self.save_btn.pack(side="right")
 
     def _select_file(self):
         path = filedialog.askopenfilename(
@@ -277,15 +326,23 @@ class StarCalibrationApp:
         self.status_var.set("Running calibration — this may take a minute…")
         self._hide_results()
 
-        threading.Thread(target=self._worker, args=(path,), daemon=True).start()
-
-    def _worker(self, path: str):
         try:
-            result = run_calibration(path, show_plots=False)
+            N    = float(self.n_var.get())
+            gmax = float(self.gmax_var.get())
+        except (tk.TclError, ValueError):
+            N, gmax = 5.0, 2.5
+
+        show_plots = bool(self.show_plots_var.get())
+        threading.Thread(target=self._worker, args=(path, N, gmax, show_plots), daemon=True).start()
+
+    def _worker(self, path: str, N: float, gmax: float, show_plots: bool):
+        try:
+            result = run_calibration(path, show_plots=False, N=N, gmax=gmax)
+            result["_show_plots"] = show_plots
             self.root.after(0, lambda: self._on_success(result))
         except Exception as exc:
             msg = str(exc)
-            self.root.after(0, lambda: self._on_error(msg))
+            self.root.after(0, lambda m=msg: self._on_error(m))
 
     def _on_success(self, result: dict):
         self._result  = result
@@ -324,6 +381,48 @@ class StarCalibrationApp:
 
         self._show_results()
         self._open_preview(result)
+        if result.get("_show_plots"):
+            self._show_diagnostic_plots(result)
+
+    def _show_diagnostic_plots(self, result: dict):
+        import numpy as np
+        import matplotlib.pyplot as plt
+        best       = result["best"]
+        wcs_result = result["wcs_result"]
+        sub        = result["sub"]
+        img_xy     = result["img_xy"]
+        sub_mean   = float(np.mean(sub))
+        sub_std    = float(np.std(sub))
+
+        plt.figure()
+        plt.imshow(sub, origin="lower", cmap="gray",
+                   vmin=sub_mean - 2 * sub_std, vmax=sub_mean + 5 * sub_std)
+        plt.scatter(img_xy[:, 0], img_xy[:, 1],
+                    s=50, edgecolor="red", facecolor="none", label="Image sources")
+        plt.scatter(best["pred_xy"][:, 0], best["pred_xy"][:, 1],
+                    s=50, edgecolor="blue", facecolor="none", label="Predicted sources")
+        plt.scatter([wcs_result["target_cx"]], [wcs_result["target_cy"]],
+                    s=100, marker="+", c="yellow", label="Target center")
+        if wcs_result["wcs_fit_success"]:
+            plt.scatter([wcs_result["zenith_x"]], [wcs_result["zenith_y"]],
+                        s=120, marker="x", c="cyan", label="Zenith (WCS)")
+            plt.plot(
+                [wcs_result["zenith_x"], wcs_result["target_cx"]],
+                [wcs_result["zenith_y"], wcs_result["target_cy"]],
+                color="cyan", linestyle="--", linewidth=1.5, label="Applied shift",
+            )
+        plt.legend()
+        plt.title(f"Best score: {best['score']} matches")
+        plt.show(block=False)
+
+        plt.figure()
+        plt.imshow(wcs_result["centered_sub"], origin="lower", cmap="gray",
+                   vmin=sub_mean - 2 * sub_std, vmax=sub_mean + 5 * sub_std)
+        plt.scatter([wcs_result["target_cx"]], [wcs_result["target_cy"]],
+                    s=120, marker="x", c="cyan", label="Centered zenith target")
+        plt.legend()
+        plt.title("Image shifted so zenith is centered")
+        plt.show(block=False)
 
     def _on_error(self, msg: str):
         self._running = False
@@ -402,6 +501,65 @@ class StarCalibrationApp:
             text="Close", font=FONT_SB, padx=16, pady=6,
             command=win.destroy,
         ).pack(side="left", padx=6)
+
+    def _open_matched_stars(self):
+        if self._result is None:
+            return
+        stars = self._result.get("matched_stars", [])
+
+        win = tk.Toplevel(self.root)
+        win.title(f"Matched Stars ({len(stars)})")
+        win.configure(bg=BG)
+        win.resizable(True, True)
+
+        hdr = tk.Frame(win, bg=SURFACE, pady=10)
+        hdr.pack(fill="x")
+        tk.Label(hdr, text=f"Matched Stars  (× {len(stars)})",
+                 font=FONT_LG, bg=SURFACE, fg=FG).pack()
+
+        # scrollable Treeview
+        frame = tk.Frame(win, bg=BG)
+        frame.pack(fill="both", expand=True, padx=16, pady=12)
+
+        cols = ("#", "Alt (°)", "Az (°)", "G mag", "Img X", "Img Y", "Dist (px)")
+        style = ttk.Style(win)
+        style.theme_use("default")
+        style.configure("Stars.Treeview",
+                        background=SURFACE, foreground=FG,
+                        fieldbackground=SURFACE, rowheight=22,
+                        font=FONT_MONO)
+        style.configure("Stars.Treeview.Heading",
+                        background=BORDER, foreground=FG, font=FONT_SB)
+        style.map("Stars.Treeview", background=[("selected", ACCENT)])
+
+        tree = ttk.Treeview(frame, columns=cols, show="headings",
+                            style="Stars.Treeview", height=20)
+        for col in cols:
+            tree.heading(col, text=col)
+            tree.column(col, width=80, anchor="center")
+        tree.column("#", width=40)
+
+        for i, s in enumerate(sorted(stars, key=lambda x: x["gmag"]), 1):
+            tree.insert("", "end", values=(
+                i,
+                f"{s['alt']:.3f}",
+                f"{s['az']:.3f}",
+                f"{s['gmag']:.2f}",
+                f"{s['img_x']:.1f}",
+                f"{s['img_y']:.1f}",
+                f"{s['dist_px']:.2f}",
+            ))
+
+        vsb = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=vsb.set)
+        tree.pack(side="left", fill="both", expand=True)
+        vsb.pack(side="right", fill="y")
+
+        HoverButton(
+            win, bg_normal=SURFACE, bg_hover=BORDER,
+            text="Close", font=FONT_SB, padx=16, pady=6,
+            command=win.destroy,
+        ).pack(pady=(0, 12))
 
     def _save_shifted_image(self):
         if self._result is None:
