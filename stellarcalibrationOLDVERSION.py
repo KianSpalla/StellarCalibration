@@ -9,9 +9,15 @@ from astropy.coordinates import EarthLocation, AltAz, SkyCoord
 from astropy.wcs.utils import fit_wcs_from_points
 from astroquery.gaia import Gaia
 from scipy.ndimage import shift as nd_shift
+from scipy.ndimage import label as nd_label
 
 #Purpose of this function is to go through the mask and find connected components and stores them in a label array. 
 #Each connected component gets a unique label ID. The function returns the label array and the total number of clusters found.
+#This is instead replaced by the scipy.nd.image.label function which is faster because it is implemented in C and optimized for performance.
+#implementatio looks like
+# def compact_search(mask):
+#    label, num_labels = nd_label(mask)
+#    return label, num_labels
 def compact_search(mask):
     height, width = mask.shape
     labels = np.zeros((height, width), dtype=int)
@@ -101,6 +107,7 @@ def query_catalog_altaz_from_meta(meta, radius_deg=60.0, gmax=2.5, top_m=None):
     Gaia.ROW_LIMIT = 200000
     ra0 = zenith_icrs.ra.deg
     dec0 = zenith_icrs.dec.deg
+    
     query = f"""
     SELECT source_id, ra, dec, phot_g_mean_mag
     FROM gaiadr3.gaia_source
@@ -527,9 +534,8 @@ def build_shifted_image_same_format(image_path, shift_x, shift_y):
     }
 
 
-def run_calibration(image_path):
+def run_calibration(image_path, show_plots=False, N=5, gmax=2.5):
     go = GONetFile.from_file(image_path)
-    N = 5
     sub = go.green
     sub_mean = float(np.mean(sub))
     sub_std = float(np.std(sub))
@@ -556,7 +562,7 @@ def run_calibration(image_path):
     cat_alt_deg, cat_az_deg, _ = query_catalog_altaz_from_meta(
         go.meta,
         radius_deg=catalog_radius_deg,
-        gmax=2.5,
+        gmax=gmax,
         top_m=None,
     )
     if len(cat_alt_deg) == 0:
