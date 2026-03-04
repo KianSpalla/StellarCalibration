@@ -472,7 +472,6 @@ def run_calibration(image_path, show_plots=False, N = 5, gmax = 2.5):
     - Maintains identical calibration/return contract.
     """
     go = GONetFile.from_file(image_path)
-    go.remove_overscan()
     sub = go.green
 
     sub_mean = float(np.mean(sub))

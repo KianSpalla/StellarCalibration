@@ -217,6 +217,7 @@ def shift_image(image_path, dx, dy):
 
 def run_calibration(image_path, show_plots=False, N=5, gmax=2.5):
     go   = GONetFile.from_file(image_path)
+    go.remove_overscan()
     sub  = np.array(go.green, dtype=float)
     meta = go.meta
 

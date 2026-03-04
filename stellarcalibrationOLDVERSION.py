@@ -107,7 +107,7 @@ def query_catalog_altaz_from_meta(meta, radius_deg=60.0, gmax=2.5, top_m=None):
     Gaia.ROW_LIMIT = 200000
     ra0 = zenith_icrs.ra.deg
     dec0 = zenith_icrs.dec.deg
-    
+
     query = f"""
     SELECT source_id, ra, dec, phot_g_mean_mag
     FROM gaiadr3.gaia_source
@@ -536,6 +536,7 @@ def build_shifted_image_same_format(image_path, shift_x, shift_y):
 
 def run_calibration(image_path, show_plots=False, N=5, gmax=2.5):
     go = GONetFile.from_file(image_path)
+    go.remove_overscan()
     sub = go.green
     sub_mean = float(np.mean(sub))
     sub_std = float(np.std(sub))
