@@ -103,6 +103,8 @@ def run_calibration(image_path, show_plots=False, N=5, gmax=2.5):
     return {
         "best": best,
         "center_result": center_result,
+        "sub": sub,
+        "img_xy": img_xy,
         "shifted_image": shifted_result["shifted_image"],
         "shifted_format": shifted_result["shifted_format"],
         "suggested_suffix": shifted_result["suggested_suffix"],
