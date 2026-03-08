@@ -1,5 +1,3 @@
-from operator import sub
-
 import numpy as np
 from scipy.ndimage import shift as nd_shift
 from PIL import Image
