@@ -5,9 +5,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from PIL import Image, ImageTk
 
-from stellarcalibrationIMPROVED import run_calibration
-#from stellarcalibrationbackend import run_calibration
-#from stellarcalibrationOLDVERSION import run_calibration
+from pipeline import run_calibration
 
 BG       = "#0d1117"
 SURFACE  = "#161b22"
@@ -242,11 +240,10 @@ class StarCalibrationApp:
 
         self.result_labels: dict = {}
         for key, display_name in [
-            ("score", "Match score"),
-            ("rms",   "RMS error"),
-            ("wcs",   "WCS fit"),
-            ("stars", "WCS stars"),
-            ("shift", "Applied shift"),
+            ("score",  "Match score"),
+            ("rms",    "RMS error"),
+            ("zenith", "Zenith pixel"),
+            ("shift",  "Applied shift"),
         ]:
             row = tk.Frame(self.results_box, bg=SURFACE)
             row.pack(fill="x", pady=2)
@@ -361,8 +358,8 @@ class StarCalibrationApp:
         self.run_btn.config(state="normal", text="▶  Run Calibration")
         self.status_var.set("Calibration complete.")
 
-        best       = result["best"]
-        wcs_result = result["wcs_result"]
+        best          = result["best"]
+        center_result = result["center_result"]
 
         rms_text = (
             f"{best['rms_pix']:.2f} px"
@@ -370,11 +367,13 @@ class StarCalibrationApp:
             else "n/a"
         )
 
-        wcs_ok     = wcs_result["wcs_fit_success"]
-        wcs_text   = "Success" if wcs_ok else "Failed"
+        zenith_text = (
+            f"x={center_result['zenith_x']:.1f}  "
+            f"y={center_result['zenith_y']:.1f} px"
+        )
         shift_text = (
-            f"dx={wcs_result['shift_x']:+.1f}  dy={wcs_result['shift_y']:+.1f} px"
-            if wcs_ok else "n/a"
+            f"dx={center_result['shift_x']:+.1f}  "
+            f"dy={center_result['shift_y']:+.1f} px"
         )
 
         self.result_labels["score"].config(
@@ -382,10 +381,7 @@ class StarCalibrationApp:
             fg=SUCCESS if best["score"] > 5 else WARN,
         )
         self.result_labels["rms"].config(text=rms_text)
-        self.result_labels["wcs"].config(
-            text=wcs_text, fg=SUCCESS if wcs_ok else ERROR,
-        )
-        self.result_labels["stars"].config(text=str(wcs_result["n_wcs_matches"]))
+        self.result_labels["zenith"].config(text=zenith_text)
         self.result_labels["shift"].config(text=shift_text)
 
         self._show_results()
@@ -396,12 +392,12 @@ class StarCalibrationApp:
     def _show_diagnostic_plots(self, result: dict):
         import numpy as np
         import matplotlib.pyplot as plt
-        best       = result["best"]
-        wcs_result = result["wcs_result"]
-        sub        = result["sub"]
-        img_xy     = result["img_xy"]
-        sub_mean   = float(np.mean(sub))
-        sub_std    = float(np.std(sub))
+        best          = result["best"]
+        center_result = result["center_result"]
+        sub           = result["sub"]
+        img_xy        = result["img_xy"]
+        sub_mean      = float(np.mean(sub))
+        sub_std       = float(np.std(sub))
 
         plt.figure()
         plt.imshow(sub, origin="lower", cmap="gray",
@@ -410,24 +406,23 @@ class StarCalibrationApp:
                     s=50, edgecolor="red", facecolor="none", label="Image sources")
         plt.scatter(best["pred_xy"][:, 0], best["pred_xy"][:, 1],
                     s=50, edgecolor="blue", facecolor="none", label="Predicted sources")
-        plt.scatter([wcs_result["target_cx"]], [wcs_result["target_cy"]],
+        plt.scatter([center_result["target_cx"]], [center_result["target_cy"]],
                     s=100, marker="+", c="yellow", label="Target center")
-        if wcs_result["wcs_fit_success"]:
-            plt.scatter([wcs_result["zenith_x"]], [wcs_result["zenith_y"]],
-                        s=120, marker="x", c="cyan", label="Zenith (WCS)")
-            plt.plot(
-                [wcs_result["zenith_x"], wcs_result["target_cx"]],
-                [wcs_result["zenith_y"], wcs_result["target_cy"]],
-                color="cyan", linestyle="--", linewidth=1.5, label="Applied shift",
-            )
+        plt.scatter([center_result["zenith_x"]], [center_result["zenith_y"]],
+                    s=120, marker="x", c="cyan", label="Zenith")
+        plt.plot(
+            [center_result["zenith_x"], center_result["target_cx"]],
+            [center_result["zenith_y"], center_result["target_cy"]],
+            color="cyan", linestyle="--", linewidth=1.5, label="Applied shift",
+        )
         plt.legend()
         plt.title(f"Best score: {best['score']} matches")
         plt.show(block=False)
 
         plt.figure()
-        plt.imshow(wcs_result["centered_sub"], origin="lower", cmap="gray",
+        plt.imshow(center_result["centered_sub"], origin="lower", cmap="gray",
                    vmin=sub_mean - 2 * sub_std, vmax=sub_mean + 5 * sub_std)
-        plt.scatter([wcs_result["target_cx"]], [wcs_result["target_cy"]],
+        plt.scatter([center_result["target_cx"]], [center_result["target_cy"]],
                     s=120, marker="x", c="cyan", label="Centered zenith target")
         plt.legend()
         plt.title("Image shifted so zenith is centered")
@@ -622,14 +617,14 @@ class StarCalibrationApp:
             return BRIGHT_STARS[best][2] if seps[best] < tol_deg else None
 
         # ── Plot ──────────────────────────────────────────────────────────
-        result     = self._result
-        stars      = result.get("matched_stars", [])
-        img_xy     = result["img_xy"]
-        wcs_result = result["wcs_result"]
-        meta       = result.get("meta")
-        dx         = wcs_result["shift_x"]
-        dy         = wcs_result["shift_y"]
-        img        = wcs_result["centered_sub"]
+        result        = self._result
+        stars         = result.get("matched_stars", [])
+        img_xy        = result["img_xy"]
+        center_result = result["center_result"]
+        meta          = result.get("meta")
+        dx            = center_result["shift_x"]
+        dy            = center_result["shift_y"]
+        img           = center_result["centered_sub"]
 
         fig, ax = plt.subplots(figsize=(10, 7))
         fig.patch.set_facecolor("#0d1117")
