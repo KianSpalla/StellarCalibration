@@ -8,14 +8,16 @@ from scipy.ndimage import (
 
 """
 dynamic_find_stars(img)
-PROBELM: when we createa mask using a threshold based on the entire image,
-    some stars in brighter areas of the sky like the center of the image or nearcity horizons/clouds
+PROBELM: when we create a mask using a threshold based on the entire image,
+    some stars in brighter areas of the sky, such as the center of the image or nearcity horizons/clouds,
     get drowned out and are not captured by the mask.
 
 SOLUTION: instead of creating a threshold based on the entire image, we can split the image into sections,
     then we take the thresholds of those individual sections to build the mask. 
     This eliminates the variance in overall brightness of different sections, 
-    and instead we are choosing stars based on contrast to their respective background.
+    and instead we are choosing stars based on contrast to their respective backgrounds.
+
+NOTE: we dont want to allow too many stars to pass the threshold until we have a better matching methodology as we can easily make false matches
 
 PSEUDO:
     dynamic_find_stars(img):
@@ -47,14 +49,12 @@ def dynamic_find_stars(img, N = 5, sectionSize = 200):
             The premise of the function is that it takes a mask and removes outliers like isolated true values
             keeping only the large compact objects, With this said, I am unsure on the threshold it uses to do this
             and whether it is the best solution for this project or not.
+
+            We can probably replace this function with min and max filtering once i figure that out, 
+            it should essentially do the same exact thing while also being more adjustable but for now this seems to work well enough.
             """
             sectionLabels, sectionNumClusters = cluster_stars(mask)
-            if sectionNumClusters > 0:
-                labels[r:r+section.shape[0], c:c+section.shape[1]] = np.where(
-                    sectionLabels > 0,
-                    sectionLabels + numClusters,
-                    0,
-                )
+            labels[r:r+section.shape[0], c:c+section.shape[1]] = np.where(sectionLabels > 0,sectionLabels + numClusters,0)
             numClusters += sectionNumClusters
 
     return labels, numClusters
