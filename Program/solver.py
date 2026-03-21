@@ -4,11 +4,15 @@ from geometry import predict_pixels_from_catalog
 """
 match_score takes a cKDTree of the image sources, the predicted pixel positions from the catalog, and a pixel tolerance.
 It queries the tree to find the nearest image source for each predicted position and counts how many are within the pixel tolerance.
+If minTolerance is provided, only matches with distance between minTolerance and pixelTolerance are counted.
 Returns the total score (number of matches), the distances to the nearest image sources, and their indices.
 """
-def match_score(imgTree, predictedXY, pixelTolerance=20.0):
+def match_score(imgTree, predictedXY, pixelTolerance=20.0, minTolerance=None):
     starDistance, starIndex = imgTree.query(predictedXY, k=1)
-    score = np.sum(starDistance <= pixelTolerance)
+    if minTolerance is not None:
+        score = np.sum((starDistance >= minTolerance) & (starDistance <= pixelTolerance))
+    else:
+        score = np.sum(starDistance <= pixelTolerance)
     return score, starDistance, starIndex
 
 """
@@ -76,7 +80,8 @@ def solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix):
     if matchedCount > 0:
         meanDist = float(np.mean(best["starDistance"][matchedMask]))
         stdDist = float(np.std(best["starDistance"][matchedMask]))
-        clipTolerance = meanDist + 2.0 * stdDist
+        clipUpper = meanDist + 2.0 * stdDist
+        clipLower = max(0.0, meanDist - 2.0 * stdDist)
 
         best["score"] = -1
 
@@ -93,7 +98,7 @@ def solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix):
             for gamma in gammaList:
                 for alpha in np.unique(alphaClip):
                     predictedXY = predict_pixels_from_catalog(catalogAltDeg, catalogAzDeg, cx, cy, radiusPix, alpha, beta, gamma)
-                    score, starDistance, starIndex = match_score(imgTree, predictedXY, pixelTolerance=clipTolerance)
+                    score, starDistance, starIndex = match_score(imgTree, predictedXY, pixelTolerance=clipUpper, minTolerance=clipLower)
                     if score > best["score"]:
                         best = {
                             "score": score,
@@ -105,11 +110,12 @@ def solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix):
                             "predictedXY": predictedXY,
                         }
 
-        clippedMask = best["starDistance"] <= clipTolerance
+        clippedMask = (best["starDistance"] >= clipLower) & (best["starDistance"] <= clipUpper)
         clippedCount = int(np.sum(clippedMask))
         best["rms_pix"] = float(np.sqrt(np.mean(best["starDistance"][clippedMask] ** 2))) if clippedCount > 0 else np.nan
         best["matched_count"] = clippedCount
-        best["clip_tolerance"] = clipTolerance
+        best["clip_upper"] = clipUpper
+        best["clip_lower"] = clipLower
     else:
         best["rms_pix"] = np.nan
         best["matched_count"] = 0
@@ -123,12 +129,12 @@ TODO:
     After the refinement pass, we compute mean + 2 * std of matched distances as a clip tolerance,
     then re-run a third refinement pass using that tighter tolerance so outliers can't influence alpha/beta/gamma.
 
-2. Gaia cache
+2. Gaia cache (DONE)
     Create a cache of stars gathered from the gaia database, so that we can use the cache when searching for stars instead
     of calling gaia everytime, this will improve performance, as well solving the instance of gaia being down
     We would give priority to the cache for searching and if necessary use gaia as a fallback.
 
-3. Ensuring we dont get multiple stars matched to the same source
+3. Ensuring we dont get multiple stars matched to the same source (WORK IN PROGRESS)
     Create a flag for star indexes on wether they are matches or not
     (This could probably be a int based on how many matches each star gets, so ideal = 1)
     (Go from one-to-many -> one-to-one relationships)

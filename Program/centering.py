@@ -42,9 +42,6 @@ It loads the image, shifts it to center the zenith, then rotates by -alphaDeg ar
 and returns the corrected image as a PIL Image object.
 """
 def build_shifted_image(imagePath, shiftX, shiftY, alphaDeg):
-    if not imagePath or shiftX is None or shiftY is None:
-        raise ValueError("imagePath, shiftX, and shiftY must all be provided.")
-
     imageArray = np.array(Image.open(imagePath))
     shift = (float(shiftY), float(shiftX)) if imageArray.ndim == 2 else (float(shiftY), float(shiftX), 0)
     shifted = nd_shift(imageArray.astype(float), shift=shift, order=1, mode="constant", cval=float(np.median(imageArray)))

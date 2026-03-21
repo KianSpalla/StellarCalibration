@@ -43,16 +43,6 @@ def dynamic_find_stars(img, N = 5, sectionSize = 200):
             sectionMed = np.median(section)
             sectionNMAD = 1.4826 * np.median(np.abs(section - sectionMed))
             mask = section > sectionMed + N * sectionNMAD
-            #mask = binary_opening(mask) 
-            """
-            This function (binary_opening) is still unclear to me, it seems to work fairly well for removing noise outliers
-            The premise of the function is that it takes a mask and removes outliers like isolated true values
-            keeping only the large compact objects, With this said, I am unsure on the threshold it uses to do this
-            and whether it is the best solution for this project or not.
-
-            We can probably replace this function with min and max filtering once i figure that out, 
-            it should essentially do the same exact thing while also being more adjustable but for now this seems to work well enough.
-            """
             sectionLabels, sectionNumClusters = cluster_stars(mask)
             labels[r:r+section.shape[0], c:c+section.shape[1]] = np.where(sectionLabels > 0,sectionLabels + numClusters,0)
             numClusters += sectionNumClusters
@@ -65,7 +55,6 @@ cluster_stars takes a mask as input, uses nd_label to create stars labeled from 
 returns labels which is a array of the connected values in the mask.
 returns numClusters, which is the number of clustered components created during the function.
 """
-
 def cluster_stars(mask):
     labels, numClusters = label(mask)
     return  labels, numClusters
