@@ -29,14 +29,17 @@ def run_calibration(imagePath, show_plots=False, N=5, gmax=2.5):
         go.meta, radiusDeg=catalogRadiusDeg, gmax=gmax, top_m=None,
     )
 
-    best = solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix)
+    best, matchedFlags = solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix)
+    print(imgXY.shape[0])
+    print(matchedFlags)
+    #print( ' This is the matched flags')
 
     centerResult = find_zenith_pixel_and_center(
         img=img, best=best, cx=cx, cy=cy, radiusPix=radiusPix,
     )
 
     print(f"catalog_stars={len(catalogAltDeg)}, image_sources={len(imgXY)}")
-    print(f"score={best['score']}, matched={best['matched_count']}, rms_pix={best['rms_pix']:.3f}")
+    print(f"score={best['score']}, matched={best['matched_count']}, rms_pix={best['rms_pix']:.3f}, clip_tolerance={best['clip_tolerance']}")
     print(
         "alpha_deg={:.3f}, beta_deg={:.3f}, gamma_deg={:.3f}".format(
             np.rad2deg(best["alpha"]),
@@ -98,4 +101,4 @@ def run_calibration(imagePath, show_plots=False, N=5, gmax=2.5):
     }
 
 if __name__ == "__main__":
-    run_calibration(r"C:\Users\spall\Desktop\GONet\StarCalibration\Testing Images\256_251029_204008_1761770474.jpg", show_plots=True, N=5, gmax=2.5)
+    run_calibration(r"C:\Users\spall\Desktop\GONet\StellarCalibration\Testing Images\202_250628_063009_1751092241.jpg", show_plots=True, N=5, gmax=2.5)
