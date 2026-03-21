@@ -1,7 +1,7 @@
 import numpy as np
 from GONet_Wizard.GONet_utils import GONetFile
 from detection import dynamic_find_stars, find_centroids, filter_by_size
-from query import query_catalog_altaz_from_meta
+from caching import filter_cache_by_location
 from geometry import filter_image_sources_by_radius
 from solver import solve_orientation
 from centering import find_zenith_pixel_and_center, build_shifted_image
@@ -25,14 +25,10 @@ def run_calibration(imagePath, show_plots=False, N=5, gmax=2.5):
         imgXY=imgXY, cx=cx, cy=cy, radiusPix=radiusPix, radiusDeg = catalogRadiusDeg,
     )
 
-    catalogAltDeg, catalogAzDeg, _ = query_catalog_altaz_from_meta(
-        go.meta, radiusDeg=catalogRadiusDeg, gmax=gmax, top_m=None,
-    )
+    meta = go.meta
+    catalogAltDeg, catalogAzDeg, catalogGmag = filter_cache_by_location(meta, gmax=gmax)
 
-    best, matchedFlags = solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix)
-    print(imgXY.shape[0])
-    print(matchedFlags)
-    #print( ' This is the matched flags')
+    best = solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix)
 
     centerResult = find_zenith_pixel_and_center(
         img=img, best=best, cx=cx, cy=cy, radiusPix=radiusPix,

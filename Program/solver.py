@@ -6,17 +6,9 @@ match_score takes a cKDTree of the image sources, the predicted pixel positions 
 It queries the tree to find the nearest image source for each predicted position and counts how many are within the pixel tolerance.
 Returns the total score (number of matches), the distances to the nearest image sources, and their indices.
 """
-def match_score(imgTree, predictedXY, pixelTolerance=20.0, matchedFlags):
+def match_score(imgTree, predictedXY, pixelTolerance=20.0):
     starDistance, starIndex = imgTree.query(predictedXY, k=1)
-    score = 0
-    for i in starIndex:
-        if(matchedFlags[i] == false):
-            starDistance[i] <= pixelTolerance
-            score += 1
-        else:
-
-
-    #score = np.sum(starDistance <= pixelTolerance)
+    score = np.sum(starDistance <= pixelTolerance)
     return score, starDistance, starIndex
 
 """
@@ -35,15 +27,13 @@ def solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix):
     gammaGrid = np.deg2rad(np.arange(0, 360, 20))
 
     best = {"score": -1}
-    matchedFlags = [False] * imgXY.shape[0]
-    #print(imgXY.size)
 
     for beta in betaGrid:
         gammaList = [0.0] if abs(beta) < 1e-12 else gammaGrid
         for gamma in gammaList:
             for alpha in alphaGrid:
                 predictedXY = predict_pixels_from_catalog(catalogAltDeg, catalogAzDeg, cx, cy, radiusPix, alpha, beta, gamma)
-                score, starDistance, starIndex = match_score(imgTree, predictedXY, pixelTolerance=25, matchedFlags)
+                score, starDistance, starIndex = match_score(imgTree, predictedXY, pixelTolerance=25)
                 if score > best["score"]:
                     best = {
                         "score": score,
@@ -68,7 +58,7 @@ def solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix):
         for gamma in gammaList:
             for alpha in np.unique(alphaRefine):
                 predictedXY = predict_pixels_from_catalog(catalogAltDeg, catalogAzDeg, cx, cy, radiusPix, alpha, beta, gamma)
-                score, starDistance, starIndex = match_score(imgTree, predictedXY, pixelTolerance=25.0, matchedFlags)
+                score, starDistance, starIndex = match_score(imgTree, predictedXY, pixelTolerance=25.0)
                 if score > best["score"]:
                     best = {
                         "score": score,
@@ -103,7 +93,7 @@ def solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix):
             for gamma in gammaList:
                 for alpha in np.unique(alphaClip):
                     predictedXY = predict_pixels_from_catalog(catalogAltDeg, catalogAzDeg, cx, cy, radiusPix, alpha, beta, gamma)
-                    score, starDistance, starIndex = match_score(imgTree, predictedXY, pixelTolerance=clipTolerance, matchedFlags)
+                    score, starDistance, starIndex = match_score(imgTree, predictedXY, pixelTolerance=clipTolerance)
                     if score > best["score"]:
                         best = {
                             "score": score,
@@ -124,7 +114,7 @@ def solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix):
         best["rms_pix"] = np.nan
         best["matched_count"] = 0
 
-    return best, matchedFlags
+    return best
 
 """
 TODO:
