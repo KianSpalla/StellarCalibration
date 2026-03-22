@@ -425,6 +425,26 @@ class StarCalibrationApp:
                     s=50, edgecolor="red", facecolor="none", label="Image sources")
         plt.scatter(best["predictedXY"][:, 0], best["predictedXY"][:, 1],
                     s=50, edgecolor="blue", facecolor="none", label="Predicted sources")
+
+        # Draw lines between matched catalog predictions and their detected sources
+        dedupMask = best.get("dedup_mask", np.zeros(len(best["starDistance"]), dtype=bool))
+        catalogNames = result.get("catalogNames", [])
+        for catIdx in range(len(best["predictedXY"])):
+            if dedupMask[catIdx]:
+                srcIdx = int(best["starIndex"][catIdx])
+                catX, catY = best["predictedXY"][catIdx]
+                srcX, srcY = imgXY[srcIdx]
+                plt.plot([catX, srcX], [catY, srcY], color="lime", linewidth=0.8, alpha=0.7)
+        plt.plot([], [], color="lime", linewidth=0.8, label="Matched pairs")
+
+        # Label matched catalog stars that have a common name
+        for catIdx in range(len(best["predictedXY"])):
+            if dedupMask[catIdx] and catIdx < len(catalogNames) and catalogNames[catIdx]:
+                px, py = best["predictedXY"][catIdx]
+                plt.annotate(catalogNames[catIdx], (px, py), color="white",
+                             fontsize=7, ha="left", va="bottom",
+                             xytext=(4, 4), textcoords="offset points")
+
         plt.scatter([centerResult["targetCenterX"]], [centerResult["targetCenterY"]],
                     s=100, marker="+", c="yellow", label="Target center")
         plt.scatter([centerResult["zenithX"]], [centerResult["zenithY"]],

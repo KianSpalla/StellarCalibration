@@ -22,7 +22,7 @@ def find_zenith_pixel_and_center(img, best, cx, cy, radiusPix):
     alphaDeg = float(np.rad2deg(best["alpha"]))
 
     centeredSub = nd_shift(img.astype(float), shift=(shiftY, shiftX), order=1, mode="constant", cval=float(np.median(img)),)
-    centeredSub = nd_rotate(centeredSub, -alphaDeg, reshape=False, order=1, mode="constant", cval=float(np.median(img)),)
+    centeredSub = nd_rotate(centeredSub, -(alphaDeg + 180.0), reshape=False, order=1, mode="constant", cval=float(np.median(img)),)
 
     return { 
         "zenithX": float(zenithX), 
@@ -45,6 +45,6 @@ def build_shifted_image(imagePath, shiftX, shiftY, alphaDeg):
     imageArray = np.array(Image.open(imagePath))
     shift = (float(shiftY), float(shiftX)) if imageArray.ndim == 2 else (float(shiftY), float(shiftX), 0)
     shifted = nd_shift(imageArray.astype(float), shift=shift, order=1, mode="constant", cval=float(np.median(imageArray)))
-    shifted = nd_rotate(shifted, -float(alphaDeg), reshape=False, order=1, mode="constant", cval=float(np.median(imageArray)))
+    shifted = nd_rotate(shifted, -(float(alphaDeg) + 180.0), reshape=False, order=1, mode="constant", cval=float(np.median(imageArray)))
     shifted = np.clip(shifted, 0, 255).astype(imageArray.dtype)
     return Image.fromarray(shifted)

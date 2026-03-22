@@ -12,8 +12,8 @@ def run_calibration(imagePath, show_plots=False, N=5, gmax=2.5):
     go.remove_overscan()
     img = go.green
 
-    labels, numLabels = dynamic_find_stars(img, N)
-    labels, numLabels = filter_by_size(labels, numLabels)
+    labels, numLabels = dynamic_find_stars(img, N, 200)
+    labels, numLabels = filter_by_size(labels, numLabels, 4, 100)
     xCentroids, yCentroids = find_centroids(img, labels, numLabels)
     imgXY = np.column_stack([xCentroids, yCentroids])
 
@@ -26,16 +26,16 @@ def run_calibration(imagePath, show_plots=False, N=5, gmax=2.5):
     )
 
     meta = go.meta
-    catalogAltDeg, catalogAzDeg, catalogGmag = filter_cache_by_location(meta, gmax=gmax)
+    catalogAltDeg, catalogAzDeg, catalogGmag, catalogNames = filter_cache_by_location(meta, gmax=gmax, catalogRadiusDeg=catalogRadiusDeg)
 
-    best = solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix)
+    best = solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix, 35)
 
     centerResult = find_zenith_pixel_and_center(
         img=img, best=best, cx=cx, cy=cy, radiusPix=radiusPix,
     )
 
     print(f"catalog_stars={len(catalogAltDeg)}, image_sources={len(imgXY)}")
-    print(f"score={best['score']}, matched={best['matched_count']}, rms_pix={best['rms_pix']:.3f}, clip_tolerance={best['clip_tolerance']}")
+    print(f"score={best['score']}, matched={best['matched_count']}, rms_pix={best['rms_pix']:.3f}")
     print(
         "alpha_deg={:.3f}, beta_deg={:.3f}, gamma_deg={:.3f}".format(
             np.rad2deg(best["alpha"]),
@@ -49,12 +49,33 @@ def run_calibration(imagePath, show_plots=False, N=5, gmax=2.5):
     if show_plots:
         import matplotlib.pyplot as plt
 
+        imgMean = float(np.mean(img))
+        imgStd = float(np.std(img))
+
         fig1, ax1 = plt.subplots()
-        ax1.imshow(img, origin="upper", cmap="gray")
+        ax1.imshow(img, origin="upper", cmap="gray",
+                   vmin=imgMean - 2 * imgStd, vmax=imgMean + 5 * imgStd)
         ax1.scatter(imgXY[:, 0], imgXY[:, 1], s=50, edgecolor="red",
                     facecolor="none", label="Detected sources")
         ax1.scatter(best["predictedXY"][:, 0], best["predictedXY"][:, 1], s=50,
                     edgecolor="blue", facecolor="none", label="Catalog predictions")
+
+        dedupMask = best.get("dedup_mask", np.zeros(len(best["starDistance"]), dtype=bool))
+        for catIdx in range(len(best["predictedXY"])):
+            if dedupMask[catIdx]:
+                srcIdx = int(best["starIndex"][catIdx])
+                catX, catY = best["predictedXY"][catIdx]
+                srcX, srcY = imgXY[srcIdx]
+                ax1.plot([catX, srcX], [catY, srcY], color="lime", linewidth=0.8, alpha=0.7)
+        ax1.plot([], [], color="lime", linewidth=0.8, label="Matched pairs")
+
+        for catIdx in range(len(best["predictedXY"])):
+            if dedupMask[catIdx] and catalogNames[catIdx]:
+                px, py = best["predictedXY"][catIdx]
+                ax1.annotate(catalogNames[catIdx], (px, py), color="white",
+                             fontsize=7, ha="left", va="bottom",
+                             xytext=(4, 4), textcoords="offset points")
+
         ax1.scatter([centerResult["targetCenterX"]], [centerResult["targetCenterY"]],
                     s=100, marker="+", c="yellow", label="Image centre")
         ax1.scatter([centerResult["zenithX"]], [centerResult["zenithY"]],
@@ -69,7 +90,8 @@ def run_calibration(imagePath, show_plots=False, N=5, gmax=2.5):
         plt.show()
 
         fig2, ax2 = plt.subplots()
-        ax2.imshow(centerResult["centeredSub"], origin="upper", cmap="gray")
+        ax2.imshow(centerResult["centeredSub"], origin="upper", cmap="gray",
+                   vmin=imgMean - 2 * imgStd, vmax=imgMean + 5 * imgStd)
         ax2.scatter([centerResult["targetCenterX"]], [centerResult["targetCenterY"]],
                     s=120, marker="x", c="cyan", label="Zenith (centred)")
         ax2.legend()
@@ -89,6 +111,7 @@ def run_calibration(imagePath, show_plots=False, N=5, gmax=2.5):
         "centerResult": centerResult,
         "img": img,
         "imgXY": imgXY,
+        "catalogNames": catalogNames,
         "shiftedImage": shiftedResult,
         "shifted_image": shiftedResult,
         "shiftedFormat": "PNG",

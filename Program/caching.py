@@ -1,54 +1,35 @@
 import os
+import csv
 import numpy as np
 import astropy.units as u
 from astropy.time import Time
 from astropy.coordinates import EarthLocation, AltAz, SkyCoord
-from astroquery.gaia import Gaia
 
 CACHE_DIR = os.path.dirname(os.path.abspath(__file__))
-CACHE_FILE = os.path.join(CACHE_DIR, "cache.csv")
-
-
-def build_cache(gmax=6.5):
-    Gaia.ROW_LIMIT = -1
-
-    query = f"""
-    SELECT ra, dec, phot_g_mean_mag
-    FROM gaiadr3.gaia_source
-    WHERE phot_g_mean_mag IS NOT NULL
-      AND phot_g_mean_mag < {gmax}
-    ORDER BY phot_g_mean_mag ASC
-    """
-
-    print(f"Querying Gaia DR3 for stars with G < {gmax} ...")
-    job = Gaia.launch_job_async(query)
-    tbl = job.get_results()
-    print(f"Retrieved {len(tbl)} stars.")
-
-    ra = np.array(tbl["ra"], dtype=np.float64)
-    dec = np.array(tbl["dec"], dtype=np.float64)
-    gmag = np.array(tbl["phot_g_mean_mag"], dtype=np.float32)
-
-    header = "ra,dec,phot_g_mean_mag"
-    data = np.column_stack((ra, dec, gmag))
-    np.savetxt(CACHE_FILE, data, delimiter=",", header=header, comments="", fmt="%.10f")
-    print(f"Cache saved to {CACHE_FILE} ({len(ra)} stars).")
+CACHE_FILE = os.path.join(CACHE_DIR, "stars.csv")
 
 
 def load_cache():
-    if not os.path.exists(CACHE_FILE):
-        raise FileNotFoundError(f"Cache not found at {CACHE_FILE}. Run build_cache() first.")
-    data = np.loadtxt(CACHE_FILE, delimiter=",", skiprows=1)
-    ra = data[:, 0]
-    dec = data[:, 1]
-    gmag = data[:, 2]
-    return ra, dec, gmag
+    names = []
+    ra_list = []
+    dec_list = []
+    mag_list = []
+    with open(CACHE_FILE, "r", newline="") as f:
+        reader = csv.reader(f)
+        next(reader)  # skip header
+        for row in reader:
+            names.append(row[0])
+            ra_list.append(float(row[1]))
+            dec_list.append(float(row[2]))
+            mag_list.append(float(row[3]))
+    return np.array(ra_list), np.array(dec_list), np.array(mag_list), names
 
 
 def filter_cache_by_location(meta, gmax=2.5, catalogRadiusDeg = 60.0):
-    ra, dec, gmag = load_cache()
-    bright = gmag < gmax
-    ra, dec, gmag = ra[bright], dec[bright], gmag[bright]
+    ra, dec, mag, names = load_cache()
+    bright = mag < gmax
+    ra, dec, mag = ra[bright], dec[bright], mag[bright]
+    names = [n for n, b in zip(names, bright) if b]
 
     lat_deg = float(meta["GPS"]["latitude"])
     lon_deg = float(meta["GPS"]["longitude"])
@@ -65,10 +46,7 @@ def filter_cache_by_location(meta, gmax=2.5, catalogRadiusDeg = 60.0):
     az = stars_altaz.az.deg
 
     above = alt > (90 - catalogRadiusDeg)
-    alt, az, gmag = alt[above], az[above], gmag[above]
+    alt, az, mag = alt[above], az[above], mag[above]
+    names = [n for n, a in zip(names, above) if a]
 
-    return alt, az, gmag
-
-
-if __name__ == "__main__":
-    build_cache()
+    return alt, az, mag, names
