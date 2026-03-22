@@ -7,13 +7,41 @@ It queries the tree to find the nearest image source for each predicted position
 If minTolerance is provided, only matches with distance between minTolerance and pixelTolerance are counted.
 Returns the total score (number of matches), the distances to the nearest image sources, and their indices.
 """
-def match_score(imgTree, predictedXY, pixelTolerance=20.0, minTolerance=None):
+def match_score(imgTree, predictedXY, maxTolerance, minTolerance=None):
     starDistance, starIndex = imgTree.query(predictedXY, k=1)
     if minTolerance is not None:
-        score = np.sum((starDistance >= minTolerance) & (starDistance <= pixelTolerance))
+        score = np.sum((starDistance >= minTolerance) & (starDistance <= maxTolerance))
     else:
-        score = np.sum(starDistance <= pixelTolerance)
+        score = np.sum(starDistance <= maxTolerance)
     return score, starDistance, starIndex
+
+"""
+deduplicate_matches resolves one-to-many conflicts where multiple catalog stars match to the same detected source.
+For each detected source claimed by more than one catalog star, only the closest catalog star is kept.
+Returns a boolean mask over catalog indices indicating which matches survived deduplication.
+"""
+def deduplicate_matches(starDistance, starIndex, tolerance):
+    catalogCount = len(starDistance)
+    validMask = starDistance <= tolerance
+    
+    sourceToMatches = {}
+    for catalogIndex in range(catalogCount):
+        if not validMask[catalogIndex]:
+            continue
+        sourceIndex = int(starIndex[catalogIndex])
+        if sourceIndex not in sourceToMatches:
+            sourceToMatches[sourceIndex] = []
+        sourceToMatches[sourceIndex].append(catalogIndex)
+    
+    keepMask = np.zeros(catalogCount, dtype=bool)
+    for sourceIndex, catalogIndices in sourceToMatches.items():
+        if len(catalogIndices) == 1:
+            keepMask[catalogIndices[0]] = True
+        else:
+            bestCatalogIndex = catalogIndices[np.argmin(starDistance[catalogIndices])]
+            keepMask[bestCatalogIndex] = True
+    
+    return keepMask
 
 """
 solve_orientation takes the detected image sources, the catalog altitudes and azimuths, the center coordinates, and the radius in pixels.
@@ -23,7 +51,7 @@ It returns the best orientation parameters, the score, and the predicted pixel p
 
 NOTE: A more in depth explanation of the alpha, beta, and gamma angles can be found in comments at the bottom of this file.
 """
-def solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix):
+def solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix, pixelTolerance):
     imgTree = cKDTree(imgXY)
 
     alphaGrid = np.deg2rad(np.arange(0, 360, 5))
@@ -37,7 +65,7 @@ def solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix):
         for gamma in gammaList:
             for alpha in alphaGrid:
                 predictedXY = predict_pixels_from_catalog(catalogAltDeg, catalogAzDeg, cx, cy, radiusPix, alpha, beta, gamma)
-                score, starDistance, starIndex = match_score(imgTree, predictedXY, pixelTolerance=25)
+                score, starDistance, starIndex = match_score(imgTree, predictedXY, pixelTolerance)
                 if score > best["score"]:
                     best = {
                         "score": score,
@@ -62,7 +90,7 @@ def solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix):
         for gamma in gammaList:
             for alpha in np.unique(alphaRefine):
                 predictedXY = predict_pixels_from_catalog(catalogAltDeg, catalogAzDeg, cx, cy, radiusPix, alpha, beta, gamma)
-                score, starDistance, starIndex = match_score(imgTree, predictedXY, pixelTolerance=25.0)
+                score, starDistance, starIndex = match_score(imgTree, predictedXY, pixelTolerance)
                 if score > best["score"]:
                     best = {
                         "score": score,
@@ -98,7 +126,7 @@ def solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix):
             for gamma in gammaList:
                 for alpha in np.unique(alphaClip):
                     predictedXY = predict_pixels_from_catalog(catalogAltDeg, catalogAzDeg, cx, cy, radiusPix, alpha, beta, gamma)
-                    score, starDistance, starIndex = match_score(imgTree, predictedXY, pixelTolerance=clipUpper, minTolerance=clipLower)
+                    score, starDistance, starIndex = match_score(imgTree, predictedXY, maxTolerance=clipUpper, minTolerance=clipLower)
                     if score > best["score"]:
                         best = {
                             "score": score,
@@ -111,14 +139,21 @@ def solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix):
                         }
 
         clippedMask = (best["starDistance"] >= clipLower) & (best["starDistance"] <= clipUpper)
-        clippedCount = int(np.sum(clippedMask))
-        best["rms_pix"] = float(np.sqrt(np.mean(best["starDistance"][clippedMask] ** 2))) if clippedCount > 0 else np.nan
-        best["matched_count"] = clippedCount
+
+        # Deduplicate: resolve one-to-many matches so each detected source is claimed by at most one catalog star
+        dedupMask = deduplicate_matches(best["starDistance"], best["starIndex"], clipUpper)
+        finalMask = clippedMask & dedupMask
+
+        finalCount = int(np.sum(finalMask))
+        best["rms_pix"] = float(np.sqrt(np.mean(best["starDistance"][finalMask] ** 2))) if finalCount > 0 else np.nan
+        best["matched_count"] = finalCount
         best["clip_upper"] = clipUpper
         best["clip_lower"] = clipLower
+        best["dedup_mask"] = finalMask
     else:
         best["rms_pix"] = np.nan
         best["matched_count"] = 0
+        best["dedup_mask"] = np.zeros(len(best.get("starDistance", [])), dtype=bool)
 
     return best
 
@@ -134,11 +169,46 @@ TODO:
     of calling gaia everytime, this will improve performance, as well solving the instance of gaia being down
     We would give priority to the cache for searching and if necessary use gaia as a fallback.
 
-3. Ensuring we dont get multiple stars matched to the same source (WORK IN PROGRESS)
+3. Ensuring we dont get multiple stars matched to the same source (DONE)
     Create a flag for star indexes on wether they are matches or not
     (This could probably be a int based on how many matches each star gets, so ideal = 1)
     (Go from one-to-many -> one-to-one relationships)
     give priority to stars based on brightness and or distance.
+
+    PSEUDO CODE:
+    Given:
+      predictedXY    — predicted pixel positions for each catalog star
+      starDistance[]  — distance from each predicted position to its nearest detected source
+      starIndex[]    — index of the nearest detected source for each predicted position
+      tolerance      — maximum match distance
+      imgXY          — detected image sources (with brightness if available)
+
+    1. Filter to valid matches:
+       matches = [(catalogIdx, starIndex[catalogIdx], starDistance[catalogIdx])
+                   for each catalogIdx where starDistance[catalogIdx] <= tolerance]
+
+    2. Group by detected source index:
+       groups = group matches by starIndex
+           → { sourceIdx: [(catalogIdx, distance), ...] }
+
+    3. For each group with more than one match (conflict):
+           candidates = all (catalogIdx, distance) pairs claiming this source
+
+           Pick the winner:
+             — Option A (distance priority): keep the candidate with the smallest distance
+             — Option B (brightness priority): keep the catalog star with the highest brightness
+             — Option C (combined):  weight by both distance and brightness to pick best
+
+           Remove all losing candidates from the match list
+
+    4. Build final one-to-one match arrays:
+       matchedCatalogIdxs  = [winner catalogIdx for each unique source]
+       matchedSourceIdxs   = [corresponding source index]
+       matchedDistances    = [corresponding distances]
+
+    5. Recompute score = len(matchedCatalogIdxs)
+
+    Return updated score, matchedCatalogIdxs, matchedSourceIdxs, matchedDistances
 
 """
 
