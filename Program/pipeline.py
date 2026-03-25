@@ -12,8 +12,12 @@ def run_calibration(imagePath, show_plots=False, N=5, gmax=2.5):
     go.remove_overscan()
     img = go.green
 
-    labels, numLabels = dynamic_find_stars(img, N, 200)
-    labels, numLabels = filter_by_size(labels, numLabels, 4, 100)
+    sectionSize = 200
+    pixelMin = 5
+    pixelMax = 200
+
+    labels, numLabels = dynamic_find_stars(img, N, sectionSize)
+    labels, numLabels = filter_by_size(labels, numLabels, pixelMin, pixelMax)
     xCentroids, yCentroids = find_centroids(img, labels, numLabels)
     imgXY = np.column_stack([xCentroids, yCentroids])
 

@@ -140,7 +140,6 @@ def solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix, pix
 
         clippedMask = (best["starDistance"] >= clipLower) & (best["starDistance"] <= clipUpper)
 
-        # Deduplicate: resolve one-to-many matches so each detected source is claimed by at most one catalog star
         dedupMask = deduplicate_matches(best["starDistance"], best["starIndex"], clipUpper)
         finalMask = clippedMask & dedupMask
 
@@ -174,42 +173,6 @@ TODO:
     (This could probably be a int based on how many matches each star gets, so ideal = 1)
     (Go from one-to-many -> one-to-one relationships)
     give priority to stars based on brightness and or distance.
-
-    PSEUDO CODE:
-    Given:
-      predictedXY    — predicted pixel positions for each catalog star
-      starDistance[]  — distance from each predicted position to its nearest detected source
-      starIndex[]    — index of the nearest detected source for each predicted position
-      tolerance      — maximum match distance
-      imgXY          — detected image sources (with brightness if available)
-
-    1. Filter to valid matches:
-       matches = [(catalogIdx, starIndex[catalogIdx], starDistance[catalogIdx])
-                   for each catalogIdx where starDistance[catalogIdx] <= tolerance]
-
-    2. Group by detected source index:
-       groups = group matches by starIndex
-           → { sourceIdx: [(catalogIdx, distance), ...] }
-
-    3. For each group with more than one match (conflict):
-           candidates = all (catalogIdx, distance) pairs claiming this source
-
-           Pick the winner:
-             — Option A (distance priority): keep the candidate with the smallest distance
-             — Option B (brightness priority): keep the catalog star with the highest brightness
-             — Option C (combined):  weight by both distance and brightness to pick best
-
-           Remove all losing candidates from the match list
-
-    4. Build final one-to-one match arrays:
-       matchedCatalogIdxs  = [winner catalogIdx for each unique source]
-       matchedSourceIdxs   = [corresponding source index]
-       matchedDistances    = [corresponding distances]
-
-    5. Recompute score = len(matchedCatalogIdxs)
-
-    Return updated score, matchedCatalogIdxs, matchedSourceIdxs, matchedDistances
-
 """
 
 """
