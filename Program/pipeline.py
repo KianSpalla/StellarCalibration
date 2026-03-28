@@ -18,7 +18,7 @@ def run_calibration(imagePath, show_plots=False, N=5, gmax=2.5):
 
     labels, numLabels = dynamic_find_stars(img, N, sectionSize)
     labels, numLabels = filter_by_size(labels, numLabels, pixelMin, pixelMax)
-    xCentroids, yCentroids = find_centroids(img, labels, numLabels)
+    xCentroids, yCentroids, totalFluxes = find_centroids(img, labels, numLabels)
     imgXY = np.column_stack([xCentroids, yCentroids])
 
     cx, cy = 1030, 760
@@ -32,7 +32,7 @@ def run_calibration(imagePath, show_plots=False, N=5, gmax=2.5):
     meta = go.meta
     catalogAltDeg, catalogAzDeg, catalogGmag, catalogNames = filter_cache_by_location(meta, gmax=gmax, catalogRadiusDeg=catalogRadiusDeg)
 
-    best = solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix, 35)
+    best = solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix, 35, catalogGmag, totalFluxes)
 
     centerResult = find_zenith_pixel_and_center(
         img=img, best=best, cx=cx, cy=cy, radiusPix=radiusPix,

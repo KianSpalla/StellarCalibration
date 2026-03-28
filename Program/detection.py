@@ -111,4 +111,4 @@ def find_centroids(img, labels, numClusters):
         xCentroids.append(float(xCenters))
         yCentroids.append(float(yCenters))
 
-    return xCentroids, yCentroids
+    return xCentroids, yCentroids, totalFluxes

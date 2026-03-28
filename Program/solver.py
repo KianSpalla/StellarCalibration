@@ -15,15 +15,19 @@ def match_score(imgTree, predictedXY, maxTolerance, minTolerance=None):
         score = np.sum(starDistance <= maxTolerance)
     return score, starDistance, starIndex
 
-"""
-deduplicate_matches resolves one-to-many conflicts where multiple catalog stars match to the same detected source.
-For each detected source claimed by more than one catalog star, only the closest catalog star is kept.
-Returns a boolean mask over catalog indices indicating which matches survived deduplication.
-"""
-def deduplicate_matches(starDistance, starIndex, tolerance):
+
+def deduplicate_matches(starDistance, starIndex, tolerance, catalogMag=None, sourceFluxes=None, brightnessWeight=0.7, distTieThreshold=0.1):
+    """
+    Resolves one-to-many conflicts where multiple catalog stars match to the same detected source.
+    For each detected source claimed by more than one catalog star, selects the catalog star with the lowest combined score:
+        score = (1 - brightnessWeight) * normDist + brightnessWeight * brightnessScore
+    where normDist is the normalized distance (0–1), and brightnessScore is the absolute log10 ratio of expected to observed flux.
+    If catalogMag or sourceFluxes is None, falls back to pure distance.
+    Returns a boolean mask over catalog indices indicating which matches survived deduplication.
+    """
     catalogCount = len(starDistance)
     validMask = starDistance <= tolerance
-    
+
     sourceToMatches = {}
     for catalogIndex in range(catalogCount):
         if not validMask[catalogIndex]:
@@ -32,15 +36,31 @@ def deduplicate_matches(starDistance, starIndex, tolerance):
         if sourceIndex not in sourceToMatches:
             sourceToMatches[sourceIndex] = []
         sourceToMatches[sourceIndex].append(catalogIndex)
-    
+
     keepMask = np.zeros(catalogCount, dtype=bool)
     for sourceIndex, catalogIndices in sourceToMatches.items():
         if len(catalogIndices) == 1:
             keepMask[catalogIndices[0]] = True
         else:
-            bestCatalogIndex = catalogIndices[np.argmin(starDistance[catalogIndices])]
+            dists = starDistance[catalogIndices]
+            normDist = dists / tolerance
+            if catalogMag is not None and sourceFluxes is not None:
+                mags = catalogMag[catalogIndices]
+                catalogFluxes = 10 ** (-0.4 * mags)
+                srcFlux = float(sourceFluxes[sourceIndex])
+                if srcFlux <= 0:
+                    brightnessScore = np.ones_like(catalogFluxes) * 10.0
+                else:
+                    brightnessScore = np.abs(np.log10(catalogFluxes / srcFlux))
+                score = (1 - brightnessWeight) * normDist + brightnessWeight * brightnessScore
+            else:
+                score = normDist
+            if catalogMag is not None and np.ptp(dists) < distTieThreshold:
+                mags = catalogMag[catalogIndices]
+                bestCatalogIndex = catalogIndices[np.argmin(mags)]
+            else:
+                bestCatalogIndex = catalogIndices[np.argmin(score)]
             keepMask[bestCatalogIndex] = True
-    
     return keepMask
 
 """
@@ -51,7 +71,7 @@ It returns the best orientation parameters, the score, and the predicted pixel p
 
 NOTE: A more in depth explanation of the alpha, beta, and gamma angles can be found in comments at the bottom of this file.
 """
-def solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix, pixelTolerance):
+def solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix, pixelTolerance, catalogMag, sourceFluxes):
     imgTree = cKDTree(imgXY)
 
     alphaGrid = np.deg2rad(np.arange(0, 360, 5))
@@ -140,7 +160,7 @@ def solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix, pix
 
         clippedMask = (best["starDistance"] >= clipLower) & (best["starDistance"] <= clipUpper)
 
-        dedupMask = deduplicate_matches(best["starDistance"], best["starIndex"], clipUpper)
+        dedupMask = deduplicate_matches(best["starDistance"], best["starIndex"], clipUpper, catalogMag, sourceFluxes)
         finalMask = clippedMask & dedupMask
 
         finalCount = int(np.sum(finalMask))
