@@ -189,57 +189,6 @@ def solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix, pix
                     }
     best["matched_count"] = len(matched_image_indices)
 
-    # matchedMask = best["distances_pix"] <= 25.0
-    # matchedCount = int(np.sum(matchedMask))
-
-    # if matchedCount > 0:
-    #     medianDist = np.median(best["distances_pix"][matchedMask])
-    #     madDist = np.std(best["distances_pix"][matchedMask] / medianDist)
-    #     clipUpper = medianDist + 3 * 1.4826 * madDist
-
-    #     best["score"] = -1
-
-    #     alphaClip = best["alpha"] + np.deg2rad(np.arange(-5.0, 5.0 + 1e-12, 0.5))
-    #     betaClip = best["beta"] + np.deg2rad(np.arange(-2.0, 2.0 + 1e-12, 0.2))
-    #     gammaClip = best["gamma"] + np.deg2rad(np.arange(-10.0, 10.0 + 1e-12, 1.0))
-
-    #     alphaClip = np.mod(alphaClip, 2 * np.pi)
-    #     gammaClip = np.mod(gammaClip, 2 * np.pi)
-    #     betaClip = np.clip(betaClip, 0.0, np.deg2rad(15.0))
-
-    #     for beta in np.unique(betaClip):
-    #         gammaList = [best["gamma"]] if abs(beta) < 1e-12 else np.unique(gammaClip)
-    #         for gamma in gammaList:
-    #             for alpha in np.unique(alphaClip):
-    #                 predictedXY = predict_pixels_from_catalog(catalogAltDeg, catalogAzDeg, cx, cy, radiusPix, alpha, beta, gamma)
-    #                 score, matched_catalog_indices, matched_image_indices, distances_pix, rms_pix = match_with_local_brightness_tiebreak(imgXY, predictedXY, sourceFluxes, catalogMag, pixelTolerance)
-    #                 if score > best["score"]:
-    #                     best = {
-    #                     "score": score,
-    #                     "alpha": alpha,
-    #                     "beta": beta,
-    #                     "gamma": gamma,
-    #                     "distances_pix": distances_pix,
-    #                     "matched_catallog_indicies": matched_catalog_indices,
-    #                     "matched_image_indicies": matched_image_indices,
-    #                     "predictedXY": predictedXY,
-    #                     "rms_pix" : rms_pix
-    #                     }
-
-    #     # clippedMask = (best["distances_pix"] >= clipLower) & (best["distances_pix"] <= clipUpper)
-    #     # finalMask = clippedMask
-
-    #     #finalMask = clippedMask
-
-    #     # finalCount = int(np.sum(finalMask))
-    #     # best["rms_pix"] = float(np.sqrt(np.mean(best["distances_pix"][finalMask] ** 2))) if finalCount > 0 else np.nan
-    #     best["matched_count"] = score
-    #     # best["clip_upper"] = clipUpper
-    #     # best["clip_lower"] = clipLower
-    #     # best["final_mask"] = finalMask
-    # else:
-    #     best["matched_count"] = score
-
     return best
 
 """
