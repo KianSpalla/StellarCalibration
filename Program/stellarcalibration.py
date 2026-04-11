@@ -426,12 +426,14 @@ class StarCalibrationApp:
         plt.scatter(best["predictedXY"][:, 0], best["predictedXY"][:, 1],
                     s=50, edgecolor="blue", facecolor="none", label="Predicted sources")
 
-        # Draw lines between matched catalog predictions and their detected sources
-        dedupMask = best.get("dedup_mask", np.zeros(len(best["starDistance"]), dtype=bool))
+        # Draw lines between matched catalog predictions and their detected sources.
+        matchedCatalogIdx = best.get("matched_catalog_indices", best.get("matched_catallog_indicies", np.array([], dtype=int)))
+        matchedImageIdx = best.get("matched_image_indices", best.get("matched_image_indicies", np.array([], dtype=int)))
+        matchedCatalogSet = set(np.asarray(matchedCatalogIdx, dtype=int))
+
         catalogNames = result.get("catalogNames", [])
-        for catIdx in range(len(best["predictedXY"])):
-            if dedupMask[catIdx]:
-                srcIdx = int(best["starIndex"][catIdx])
+        for catIdx, srcIdx in zip(np.asarray(matchedCatalogIdx, dtype=int), np.asarray(matchedImageIdx, dtype=int)):
+            if 0 <= catIdx < len(best["predictedXY"]) and 0 <= srcIdx < len(imgXY):
                 catX, catY = best["predictedXY"][catIdx]
                 srcX, srcY = imgXY[srcIdx]
                 plt.plot([catX, srcX], [catY, srcY], color="lime", linewidth=0.8, alpha=0.7)
@@ -439,7 +441,7 @@ class StarCalibrationApp:
 
         # Label matched catalog stars that have a common name
         for catIdx in range(len(best["predictedXY"])):
-            if dedupMask[catIdx] and catIdx < len(catalogNames) and catalogNames[catIdx]:
+            if catIdx in matchedCatalogSet and catIdx < len(catalogNames) and catalogNames[catIdx]:
                 px, py = best["predictedXY"][catIdx]
                 plt.annotate(catalogNames[catIdx], (px, py), color="white",
                              fontsize=7, ha="left", va="bottom",

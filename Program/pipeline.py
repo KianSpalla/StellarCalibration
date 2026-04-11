@@ -30,7 +30,11 @@ def run_calibration(imagePath, show_plots=False, N=5, gmax=2.5):
     )
 
     meta = go.meta
-    catalogAltDeg, catalogAzDeg, catalogGmag, catalogNames = filter_cache_by_location(meta, gmax=gmax, catalogRadiusDeg=catalogRadiusDeg)
+    catalogAltDeg, catalogAzDeg, catalogGmag, catalogNames, planet_data = filter_cache_by_location(
+        meta,
+        gmax=gmax,
+        catalogRadiusDeg=catalogRadiusDeg,
+    )
 
     best = solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix, 35, catalogGmag, totalFluxes)
 
@@ -64,17 +68,19 @@ def run_calibration(imagePath, show_plots=False, N=5, gmax=2.5):
         ax1.scatter(best["predictedXY"][:, 0], best["predictedXY"][:, 1], s=50,
                     edgecolor="blue", facecolor="none", label="Catalog predictions")
 
-        dedupMask = best.get("dedup_mask", np.zeros(len(best["starDistance"]), dtype=bool))
-        for catIdx in range(len(best["predictedXY"])):
-            if dedupMask[catIdx]:
-                srcIdx = int(best["starIndex"][catIdx])
+        matchedCatalogIdx = best.get("matched_catalog_indices", best.get("matched_catallog_indicies", np.array([], dtype=int)))
+        matchedImageIdx = best.get("matched_image_indices", best.get("matched_image_indicies", np.array([], dtype=int)))
+        matchedCatalogSet = set(np.asarray(matchedCatalogIdx, dtype=int))
+
+        for catIdx, srcIdx in zip(np.asarray(matchedCatalogIdx, dtype=int), np.asarray(matchedImageIdx, dtype=int)):
+            if 0 <= catIdx < len(best["predictedXY"]) and 0 <= srcIdx < len(imgXY):
                 catX, catY = best["predictedXY"][catIdx]
                 srcX, srcY = imgXY[srcIdx]
                 ax1.plot([catX, srcX], [catY, srcY], color="lime", linewidth=0.8, alpha=0.7)
         ax1.plot([], [], color="lime", linewidth=0.8, label="Matched pairs")
 
         for catIdx in range(len(best["predictedXY"])):
-            if dedupMask[catIdx] and catalogNames[catIdx]:
+            if catIdx in matchedCatalogSet and catIdx < len(catalogNames) and catalogNames[catIdx]:
                 px, py = best["predictedXY"][catIdx]
                 ax1.annotate(catalogNames[catIdx], (px, py), color="white",
                              fontsize=7, ha="left", va="bottom",
@@ -116,6 +122,8 @@ def run_calibration(imagePath, show_plots=False, N=5, gmax=2.5):
         "img": img,
         "imgXY": imgXY,
         "catalogNames": catalogNames,
+        "planetData": planet_data,
+        "planet_data": planet_data,
         "shiftedImage": shiftedResult,
         "shifted_image": shiftedResult,
         "shiftedFormat": "PNG",
