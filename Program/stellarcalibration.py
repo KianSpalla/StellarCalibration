@@ -110,7 +110,7 @@ class StarCalibrationApp:
 
         tk.Label(
             hdr,
-            text="Calibrate a GONet all-sky image using the Gaia star catalogue",
+            text="Calibrate a GONet all-sky image using the SIMBAD star catalogue",
             font=("Segoe UI", 9), bg=SURFACE, fg=FG_DIM,
         ).pack(pady=(4, 0))
 
@@ -244,7 +244,7 @@ class StarCalibrationApp:
             insertbackground=FG,
         ).pack(side="left", padx=(4, 14))
 
-        tk.Label(params_row_2, text="Gaia mag limit:",
+        tk.Label(params_row_2, text="Vmag limit:",
                  font=FONT, bg=BG, fg=FG_DIM).pack(side="left")
         self.gmax_var = tk.DoubleVar(value=2.5)
         tk.Spinbox(
