@@ -7,14 +7,20 @@ from solver import solve_orientation
 from centering import find_zenith_pixel_and_center, build_shifted_image
 
 
-def run_calibration(imagePath, show_plots=False, N=5, gmax=2.5):
+def run_calibration(
+    imagePath,
+    show_plots=False,
+    gmax=2.5,
+    pixelMin=5,
+    pixelMax=50,
+    catalogRadiusDeg=60.0,
+    sectionSize=200,
+):
     go = GONetFile.from_file(imagePath)
     go.remove_overscan()
     img = go.green
 
-    sectionSize = 200
-    pixelMin = 5
-    pixelMax = 200
+    N = 5
 
     labels, numLabels = dynamic_find_stars(img, N, sectionSize)
     labels, numLabels = filter_by_size(labels, numLabels, pixelMin, pixelMax)
@@ -23,7 +29,6 @@ def run_calibration(imagePath, show_plots=False, N=5, gmax=2.5):
 
     cx, cy = 1030, 760
     radiusPix = 740
-    catalogRadiusDeg = 60.0
 
     imgXY = filter_image_sources_by_radius(
         imgXY=imgXY, cx=cx, cy=cy, radiusPix=radiusPix, radiusDeg = catalogRadiusDeg,
@@ -132,4 +137,4 @@ def run_calibration(imagePath, show_plots=False, N=5, gmax=2.5):
     }
 
 if __name__ == "__main__":
-    run_calibration(r"C:\Users\spall\Desktop\GONet\StellarCalibration\Testing Images\202_250628_063009_1751092241.jpg", show_plots=True, N=5, gmax=2.5)
+    run_calibration(r"C:\Users\spall\Desktop\GONet\StellarCalibration\Testing Images\202_250628_063009_1751092241.jpg", show_plots=True, gmax=2.5)

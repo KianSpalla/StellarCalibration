@@ -193,26 +193,62 @@ class StarCalibrationApp:
         )
         self.thumb_label.place(relx=0.5, rely=0.5, anchor="center")
 
-        # ── Detection parameters ─────────────────────────────────────────────
-        params_row = tk.Frame(body, bg=BG)
-        params_row.pack(fill="x", pady=(0, 14))
+        # ── Detection / catalog parameters ──────────────────────────────────
+        params_row_1 = tk.Frame(body, bg=BG)
+        params_row_1.pack(fill="x", pady=(0, 8))
 
-        tk.Label(params_row, text="Detection threshold (N σ):",
+        tk.Label(params_row_1, text="Min pixels:",
                  font=FONT, bg=BG, fg=FG_DIM).pack(side="left")
-        self.n_var = tk.DoubleVar(value=5.0)
+        self.pixel_min_var = tk.IntVar(value=5)
         tk.Spinbox(
-            params_row, from_=1.0, to=20.0, increment=0.5,
-            textvariable=self.n_var, width=5,
+            params_row_1, from_=1, to=200, increment=1,
+            textvariable=self.pixel_min_var, width=5,
             font=FONT, bg=SURFACE, fg=FG,
             buttonbackground=BORDER, relief="flat",
             insertbackground=FG,
-        ).pack(side="left", padx=(4, 20))
+        ).pack(side="left", padx=(4, 14))
 
-        tk.Label(params_row, text="Gaia mag limit:",
+        tk.Label(params_row_1, text="Max pixels:",
+                 font=FONT, bg=BG, fg=FG_DIM).pack(side="left")
+        self.pixel_max_var = tk.IntVar(value=50)
+        tk.Spinbox(
+            params_row_1, from_=2, to=1000, increment=1,
+            textvariable=self.pixel_max_var, width=6,
+            font=FONT, bg=SURFACE, fg=FG,
+            buttonbackground=BORDER, relief="flat",
+            insertbackground=FG,
+        ).pack(side="left", padx=(4, 0))
+
+        params_row_2 = tk.Frame(body, bg=BG)
+        params_row_2.pack(fill="x", pady=(0, 14))
+
+        tk.Label(params_row_2, text="Radius (deg):",
+                 font=FONT, bg=BG, fg=FG_DIM).pack(side="left")
+        self.radius_var = tk.DoubleVar(value=60.0)
+        tk.Spinbox(
+            params_row_2, from_=10.0, to=90.0, increment=1.0,
+            textvariable=self.radius_var, width=6,
+            font=FONT, bg=SURFACE, fg=FG,
+            buttonbackground=BORDER, relief="flat",
+            insertbackground=FG,
+        ).pack(side="left", padx=(4, 14))
+
+        tk.Label(params_row_2, text="Section size:",
+                 font=FONT, bg=BG, fg=FG_DIM).pack(side="left")
+        self.section_size_var = tk.IntVar(value=200)
+        tk.Spinbox(
+            params_row_2, from_=50, to=1000, increment=10,
+            textvariable=self.section_size_var, width=6,
+            font=FONT, bg=SURFACE, fg=FG,
+            buttonbackground=BORDER, relief="flat",
+            insertbackground=FG,
+        ).pack(side="left", padx=(4, 14))
+
+        tk.Label(params_row_2, text="Gaia mag limit:",
                  font=FONT, bg=BG, fg=FG_DIM).pack(side="left")
         self.gmax_var = tk.DoubleVar(value=2.5)
         tk.Spinbox(
-            params_row, from_=1.0, to=8.0, increment=0.5,
+            params_row_2, from_=1.0, to=8.0, increment=0.5,
             textvariable=self.gmax_var, width=5,
             font=FONT, bg=SURFACE, fg=FG,
             buttonbackground=BORDER, relief="flat",
@@ -351,17 +387,47 @@ class StarCalibrationApp:
         self._hide_results()
 
         try:
-            N    = float(self.n_var.get())
+            pixel_min = int(self.pixel_min_var.get())
+            pixel_max = int(self.pixel_max_var.get())
+            radius_deg = float(self.radius_var.get())
+            section_size = int(self.section_size_var.get())
             gmax = float(self.gmax_var.get())
         except (tk.TclError, ValueError):
-            N, gmax = 5.0, 2.5
+            pixel_min, pixel_max, radius_deg, section_size, gmax = 5, 50, 60.0, 200, 2.5
+
+        if pixel_max < pixel_min:
+            pixel_min, pixel_max = pixel_max, pixel_min
+
+        radius_deg = max(1.0, min(90.0, radius_deg))
+        section_size = max(10, section_size)
 
         show_plots = bool(self.show_plots_var.get())
-        threading.Thread(target=self._worker, args=(path, N, gmax, show_plots), daemon=True).start()
+        threading.Thread(
+            target=self._worker,
+            args=(path, gmax, pixel_min, pixel_max, radius_deg, section_size, show_plots),
+            daemon=True,
+        ).start()
 
-    def _worker(self, path: str, N: float, gmax: float, show_plots: bool):
+    def _worker(
+        self,
+        path: str,
+        gmax: float,
+        pixel_min: int,
+        pixel_max: int,
+        radius_deg: float,
+        section_size: int,
+        show_plots: bool,
+    ):
         try:
-            result = run_calibration(path, show_plots=False, N=N, gmax=gmax)
+            result = run_calibration(
+                path,
+                show_plots=False,
+                gmax=gmax,
+                pixelMin=pixel_min,
+                pixelMax=pixel_max,
+                catalogRadiusDeg=radius_deg,
+                sectionSize=section_size,
+            )
             result["_show_plots"] = show_plots
             self.root.after(0, lambda: self._on_success(result))
         except Exception as exc:

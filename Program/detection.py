@@ -3,7 +3,6 @@ from scipy.ndimage import (
     label,
     sum,
     center_of_mass,
-    binary_opening
 )
 
 """

@@ -4,7 +4,7 @@ import numpy as np
 import astropy.units as u
 from astropy.time import Time
 from astropy.coordinates import EarthLocation, AltAz, SkyCoord
-from planet_calculation import get_planets
+from planets import get_planets
 
 CACHE_DIR = os.path.dirname(os.path.abspath(__file__))
 CACHE_FILE = os.path.join(CACHE_DIR, "stars.csv")
