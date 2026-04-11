@@ -45,6 +45,6 @@ def build_shifted_image(imagePath, shiftX, shiftY, alphaDeg):
     imageArray = np.array(Image.open(imagePath))
     shift = (float(shiftY), float(shiftX)) if imageArray.ndim == 2 else (float(shiftY), float(shiftX), 0)
     shifted = nd_shift(imageArray.astype(float), shift=shift, order=1, mode="constant", cval=float(np.median(imageArray)))
-    shifted = nd_rotate(shifted, -(float(alphaDeg) + 180.0), reshape=False, order=1, mode="constant", cval=float(np.median(imageArray)))
+    shifted = nd_rotate(shifted, (float(alphaDeg) + 180.0), reshape=False, order=1, mode="constant", cval=float(np.median(imageArray)))
     shifted = np.clip(shifted, 0, 255).astype(imageArray.dtype)
     return Image.fromarray(shifted)
