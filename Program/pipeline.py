@@ -1,4 +1,5 @@
 import numpy as np
+import time
 from GONet_Wizard.GONet_utils import GONetFile
 from detection import dynamic_find_stars, find_centroids, filter_by_size
 from caching import filter_cache_by_location
@@ -16,6 +17,7 @@ def run_calibration(
     catalogRadiusDeg=60.0,
     sectionSize=200,
 ):
+    t0 = time.perf_counter()
     go = GONetFile.from_file(imagePath)
     go.remove_overscan()
     img = go.green
@@ -120,6 +122,7 @@ def run_calibration(
         alphaDeg=centerResult["alphaDeg"],
     )
     print("Shifted image prepared (not yet saved).")
+    print(f"run_calibration_time_s={time.perf_counter() - t0:.3f}")
 
     return {
         "best": best,
