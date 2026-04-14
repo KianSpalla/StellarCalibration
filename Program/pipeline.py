@@ -7,6 +7,10 @@ from geometry import filter_image_sources_by_radius
 from solver import solve_orientation
 from centering import find_zenith_pixel_and_center, build_shifted_image
 
+"""
+Helper function to rotate image.
+This is only used for testing to see whether the rotation of the image impacts our matching
+"""
 def rotateImage(img, angle, cx, cy):
     if img.ndim < 2:
         return img
@@ -42,6 +46,9 @@ def rotateImage(img, angle, cx, cy):
     out[y_new[keep], x_new[keep]] = img[y[keep], x[keep]]
     return out
 
+"""
+MAIN PIPELINE
+"""
 def run_calibration(
     imagePath,
     show_plots=False,
@@ -51,42 +58,53 @@ def run_calibration(
     catalogRadiusDeg=60.0,
     sectionSize=200,
 ):
+#Pipeline
+    #Center pixels and radius. This may change based on what GONet is being used
     cx, cy = 1030, 760
     radiusPix = 740
 
+    # Start timer for testing
     t0 = time.perf_counter()
+
+    #Get GONet image from path
     go = GONetFile.from_file(imagePath)
     go.remove_overscan()
+
+    #Get the green channel in img
     img = go.green
 
     #Rotation is for testing only. This should be set to 0 in production
     rotationAngle = 90
     img = rotateImage(img, rotationAngle, cx, cy)
 
+    #Threshold for finding stars
     N = 5
 
+    #Finds stars in image
     labels, numLabels = dynamic_find_stars(img, N, sectionSize)
+
+    #Filters stars based on size 
     labels, numLabels = filter_by_size(labels, numLabels, pixelMin, pixelMax)
+
+    #Finds centroids and fluxes for each star
     xCentroids, yCentroids, totalFluxes = find_centroids(img, labels, numLabels)
     imgXY = np.column_stack([xCentroids, yCentroids])
 
-    imgXY = filter_image_sources_by_radius(
-        imgXY=imgXY, cx=cx, cy=cy, radiusPix=radiusPix, radiusDeg = catalogRadiusDeg,
-    )
+    #filters out stars based on radius
+    imgXY = filter_image_sources_by_radius(imgXY=imgXY, cx=cx, cy=cy, radiusPix=radiusPix, radiusDeg = catalogRadiusDeg)
 
+    #Grab meta data from GONet Image
     meta = go.meta
-    catalogAltDeg, catalogAzDeg, catalogGmag, catalogNames, planet_data = filter_cache_by_location(
-        meta,
-        gmax=gmax,
-        catalogRadiusDeg=catalogRadiusDeg,
-    )
+    #Grabs stars + planets from cache that appear in the sky at the date, time, and location from the meta data.
+    catalogAltDeg, catalogAzDeg, catalogVmag, catalogNames, planet_data = filter_cache_by_location(meta, gmax=gmax, catalogRadiusDeg=catalogRadiusDeg)
 
-    best = solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix, 35, catalogGmag, totalFluxes)
+    #Solver that rotates through three angles and gets matches, returns the best rotations
+    best = solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix, 35, catalogVmag, totalFluxes)
 
-    centerResult = find_zenith_pixel_and_center(
-        img=img, best=best, cx=cx, cy=cy, radiusPix=radiusPix,
-    )
+    #Get zenith pixel coordinates based on best solve
+    centerResult = find_zenith_pixel_and_center(img=img, best=best, cx=cx, cy=cy, radiusPix=radiusPix)
 
+#Formating
     print(f"Time for pipeline={time.perf_counter() - t0:.3f}")
 
     print(f"catalog_stars={len(catalogAltDeg)}, image_sources={len(imgXY)}")
