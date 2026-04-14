@@ -7,6 +7,40 @@ from geometry import filter_image_sources_by_radius
 from solver import solve_orientation
 from centering import find_zenith_pixel_and_center, build_shifted_image
 
+def rotateImage(img, angle, cx, cy):
+    if img.ndim < 2:
+        return img
+
+    k = int(round(float(angle) / 90.0))
+    if abs(float(angle) - 90.0 * k) > 1e-9:
+        raise ValueError("rotateImage only supports multiples of 90 degrees without intensity interpolation")
+
+    k %= 4
+    if k == 0:
+        return img
+
+    h, w = img.shape[:2]
+    y, x = np.indices((h, w))
+    dx = x - float(cx)
+    dy = y - float(cy)
+
+    if k == 1:
+        x_new = float(cx) - dy
+        y_new = float(cy) + dx
+    elif k == 2:
+        x_new = float(cx) - dx
+        y_new = float(cy) - dy
+    else:
+        x_new = float(cx) + dy
+        y_new = float(cy) - dx
+
+    x_new = np.rint(x_new).astype(int)
+    y_new = np.rint(y_new).astype(int)
+
+    out = img.copy()
+    keep = (x_new >= 0) & (x_new < w) & (y_new >= 0) & (y_new < h)
+    out[y_new[keep], x_new[keep]] = img[y[keep], x[keep]]
+    return out
 
 def run_calibration(
     imagePath,
@@ -17,10 +51,17 @@ def run_calibration(
     catalogRadiusDeg=60.0,
     sectionSize=200,
 ):
+    cx, cy = 1030, 760
+    radiusPix = 740
+
     t0 = time.perf_counter()
     go = GONetFile.from_file(imagePath)
     go.remove_overscan()
     img = go.green
+
+    #Rotation is for testing only. This should be set to 0 in production
+    rotationAngle = 90
+    img = rotateImage(img, rotationAngle, cx, cy)
 
     N = 5
 
@@ -28,9 +69,6 @@ def run_calibration(
     labels, numLabels = filter_by_size(labels, numLabels, pixelMin, pixelMax)
     xCentroids, yCentroids, totalFluxes = find_centroids(img, labels, numLabels)
     imgXY = np.column_stack([xCentroids, yCentroids])
-
-    cx, cy = 1030, 760
-    radiusPix = 740
 
     imgXY = filter_image_sources_by_radius(
         imgXY=imgXY, cx=cx, cy=cy, radiusPix=radiusPix, radiusDeg = catalogRadiusDeg,
@@ -48,6 +86,8 @@ def run_calibration(
     centerResult = find_zenith_pixel_and_center(
         img=img, best=best, cx=cx, cy=cy, radiusPix=radiusPix,
     )
+
+    print(f"Time for pipeline={time.perf_counter() - t0:.3f}")
 
     print(f"catalog_stars={len(catalogAltDeg)}, image_sources={len(imgXY)}")
     print(f"score={best['score']}, matched={best['matched_count']}, rms_pix={best['rms_pix']:.3f}")
@@ -119,10 +159,9 @@ def run_calibration(
         imagePath=imagePath,
         shiftX=centerResult["shiftX"],
         shiftY=centerResult["shiftY"],
-        alphaDeg=centerResult["alphaDeg"],
+        alphaDeg=centerResult["alphaDeg"] - rotationAngle,
     )
     print("Shifted image prepared (not yet saved).")
-    print(f"run_calibration_time_s={time.perf_counter() - t0:.3f}")
 
     return {
         "best": best,

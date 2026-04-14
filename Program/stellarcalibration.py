@@ -345,8 +345,6 @@ class StarCalibrationApp:
                 ("All Files",  "*.*"),
                 ("JPG Files",  "*.jpg"),
                 ("JPEG Files", "*.jpeg"),
-                ("PNG Files",  "*.png"),
-                ("TIFF Files", "*.tif;*.tiff"),
             ],
         )
         if not path:
