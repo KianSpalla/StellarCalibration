@@ -295,10 +295,10 @@ class StarCalibrationApp:
 
         tk.Label(params_row_2, text="Vmag limit:",
                  font=FONT, bg=SURFACE, fg=FG_DIM).pack(side="left")
-        self.gmax_var = tk.DoubleVar(value=2.5)
+        self.vmax_var = tk.DoubleVar(value=2.5)
         tk.Spinbox(
             params_row_2, from_=1.0, to=8.0, increment=0.5,
-            textvariable=self.gmax_var, width=5,
+            textvariable=self.vmax_var, width=5,
             font=FONT, bg=BG, fg=FG,
             buttonbackground=BORDER, relief="flat",
             insertbackground=FG,
@@ -447,9 +447,9 @@ class StarCalibrationApp:
             pixel_max = int(self.pixel_max_var.get())
             radius_deg = float(self.radius_var.get())
             section_size = int(self.section_size_var.get())
-            gmax = float(self.gmax_var.get())
+            vmax = float(self.vmax_var.get())
         except (tk.TclError, ValueError):
-            pixel_min, pixel_max, radius_deg, section_size, gmax = 5, 50, 60.0, 200, 2.5
+            pixel_min, pixel_max, radius_deg, section_size, vmax = 5, 50, 60.0, 200, 2.5
 
         if pixel_max < pixel_min:
             pixel_min, pixel_max = pixel_max, pixel_min
@@ -460,14 +460,14 @@ class StarCalibrationApp:
         show_plots = bool(self.show_plots_var.get())
         threading.Thread(
             target=self._worker,
-            args=(path, gmax, pixel_min, pixel_max, radius_deg, section_size, show_plots),
+            args=(path, vmax, pixel_min, pixel_max, radius_deg, section_size, show_plots),
             daemon=True,
         ).start()
 
     def _worker(
         self,
         path: str,
-        gmax: float,
+        vmax: float,
         pixel_min: int,
         pixel_max: int,
         radius_deg: float,
@@ -478,7 +478,7 @@ class StarCalibrationApp:
             result = run_calibration(
                 path,
                 show_plots=False,
-                gmax=gmax,
+                vmag=vmax,
                 pixelMin=pixel_min,
                 pixelMax=pixel_max,
                 catalogRadiusDeg=radius_deg,
