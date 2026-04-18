@@ -25,8 +25,8 @@ FONT_TITLE = ("Segoe UI", 17, "bold")
 FONT_MONO  = ("Consolas", 9)
 
 THUMB_SIZE = (280, 196)
-WIN_WIDTH  = 560
-WIN_HEIGHT = 720
+WIN_WIDTH  = 640
+WIN_HEIGHT = 760
 
 
 def _to_displayable(pil_img: Image.Image) -> Image.Image:
@@ -86,6 +86,13 @@ class StarCalibrationApp:
         y = (sh - WIN_HEIGHT) // 2
         r.geometry(f"{WIN_WIDTH}x{WIN_HEIGHT}+{x}+{y}")
 
+        try:
+            import os
+            _ico = os.path.join(os.path.dirname(__file__), "stars.ico")
+            r.iconbitmap(_ico)
+        except Exception:
+            pass
+
         style = ttk.Style(r)
         style.theme_use("default")
         style.configure(
@@ -97,22 +104,52 @@ class StarCalibrationApp:
         )
         style.configure("TSeparator", background=BORDER)
 
+        # Colour the native Windows title bar to match BG
+        try:
+            import ctypes
+            DWMWA_CAPTION_COLOR = 35
+            # COLORREF is 0x00BBGGRR
+            r_val = int(BG[1:3], 16)
+            g_val = int(BG[3:5], 16)
+            b_val = int(BG[5:7], 16)
+            colorref = ctypes.c_uint32(r_val | (g_val << 8) | (b_val << 16))
+            hwnd = ctypes.windll.user32.GetParent(r.winfo_id())
+            if hwnd == 0:
+                hwnd = r.winfo_id()
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                hwnd, DWMWA_CAPTION_COLOR,
+                ctypes.byref(colorref), ctypes.sizeof(colorref),
+            )
+        except Exception:
+            pass
+
     def _build_ui(self):
         root = self.root
 
-        hdr = tk.Frame(root, bg=SURFACE, pady=20)
+        # Thin accent bar at very top
+        tk.Frame(root, bg=ACCENT, height=3).pack(fill="x")
+
+        hdr = tk.Frame(root, bg=SURFACE, pady=22)
         hdr.pack(fill="x")
 
+        # Logo + title row
+        title_row = tk.Frame(hdr, bg=SURFACE)
+        title_row.pack()
         tk.Label(
-            hdr, text="★  Star Calibration",
-            font=FONT_TITLE, bg=SURFACE, fg=FG,
-        ).pack()
-
+            title_row, text="★",
+            font=("Segoe UI", 20), bg=SURFACE, fg=ACCENT,
+        ).pack(side="left", padx=(0, 10))
+        title_col = tk.Frame(title_row, bg=SURFACE)
+        title_col.pack(side="left")
         tk.Label(
-            hdr,
-            text="Calibrate a GONet all-sky image using the SIMBAD star catalogue",
-            font=("Segoe UI", 9), bg=SURFACE, fg=FG_DIM,
-        ).pack(pady=(4, 0))
+            title_col, text="Star Calibration",
+            font=FONT_TITLE, bg=SURFACE, fg=FG, anchor="w",
+        ).pack(anchor="w")
+        tk.Label(
+            title_col,
+            text="GONet all-sky image · SIMBAD star catalogue",
+            font=("Segoe UI", 9), bg=SURFACE, fg=FG_DIM, anchor="w",
+        ).pack(anchor="w", pady=(2, 0))
 
         ttk.Separator(root).pack(fill="x")
 
@@ -122,8 +159,10 @@ class StarCalibrationApp:
 
         style = ttk.Style(root)
         style.configure("Dark.Vertical.TScrollbar",
-                        troughcolor=SURFACE, background=BORDER,
-                        arrowcolor=FG_DIM, borderwidth=0)
+                        troughcolor=BG, background=BG,
+                        arrowcolor=BG, borderwidth=0, width=6)
+        style.map("Dark.Vertical.TScrollbar",
+                  background=[("active", BORDER), ("pressed", FG_DIM)])
 
         vscroll = ttk.Scrollbar(scroll_outer, orient="vertical",
                                 style="Dark.Vertical.TScrollbar")
@@ -194,70 +233,78 @@ class StarCalibrationApp:
         self.thumb_label.place(relx=0.5, rely=0.5, anchor="center")
 
         # ── Detection / catalog parameters ──────────────────────────────────
-        params_row_1 = tk.Frame(body, bg=BG)
-        params_row_1.pack(fill="x", pady=(0, 8))
+        tk.Label(body, text="PARAMETERS", font=("Segoe UI", 8, "bold"),
+                 bg=BG, fg=FG_DIM, anchor="w").pack(fill="x", pady=(0, 6))
+
+        params_card = tk.Frame(body, bg=SURFACE,
+                               highlightthickness=1, highlightbackground=BORDER,
+                               padx=16, pady=14)
+        params_card.pack(fill="x", pady=(0, 14))
+
+        params_row_1 = tk.Frame(params_card, bg=SURFACE)
+        params_row_1.pack(fill="x", pady=(0, 10))
 
         tk.Label(params_row_1, text="Min pixels:",
-                 font=FONT, bg=BG, fg=FG_DIM).pack(side="left")
+                 font=FONT, bg=SURFACE, fg=FG_DIM).pack(side="left")
         self.pixel_min_var = tk.IntVar(value=5)
         tk.Spinbox(
             params_row_1, from_=1, to=200, increment=1,
             textvariable=self.pixel_min_var, width=5,
-            font=FONT, bg=SURFACE, fg=FG,
+            font=FONT, bg=BG, fg=FG,
             buttonbackground=BORDER, relief="flat",
             insertbackground=FG,
-        ).pack(side="left", padx=(4, 14))
+        ).pack(side="left", padx=(6, 24))
 
         tk.Label(params_row_1, text="Max pixels:",
-                 font=FONT, bg=BG, fg=FG_DIM).pack(side="left")
+                 font=FONT, bg=SURFACE, fg=FG_DIM).pack(side="left")
         self.pixel_max_var = tk.IntVar(value=50)
         tk.Spinbox(
             params_row_1, from_=2, to=1000, increment=1,
             textvariable=self.pixel_max_var, width=6,
-            font=FONT, bg=SURFACE, fg=FG,
+            font=FONT, bg=BG, fg=FG,
             buttonbackground=BORDER, relief="flat",
             insertbackground=FG,
-        ).pack(side="left", padx=(4, 0))
+        ).pack(side="left", padx=(6, 0))
 
-        params_row_2 = tk.Frame(body, bg=BG)
-        params_row_2.pack(fill="x", pady=(0, 14))
+        params_row_2 = tk.Frame(params_card, bg=SURFACE)
+        params_row_2.pack(fill="x")
 
         tk.Label(params_row_2, text="Radius (deg):",
-                 font=FONT, bg=BG, fg=FG_DIM).pack(side="left")
+                 font=FONT, bg=SURFACE, fg=FG_DIM).pack(side="left")
         self.radius_var = tk.DoubleVar(value=60.0)
         tk.Spinbox(
             params_row_2, from_=10.0, to=90.0, increment=1.0,
             textvariable=self.radius_var, width=6,
-            font=FONT, bg=SURFACE, fg=FG,
+            font=FONT, bg=BG, fg=FG,
             buttonbackground=BORDER, relief="flat",
             insertbackground=FG,
-        ).pack(side="left", padx=(4, 14))
+        ).pack(side="left", padx=(6, 24))
 
         tk.Label(params_row_2, text="Section size:",
-                 font=FONT, bg=BG, fg=FG_DIM).pack(side="left")
+                 font=FONT, bg=SURFACE, fg=FG_DIM).pack(side="left")
         self.section_size_var = tk.IntVar(value=200)
         tk.Spinbox(
             params_row_2, from_=50, to=1000, increment=10,
             textvariable=self.section_size_var, width=6,
-            font=FONT, bg=SURFACE, fg=FG,
+            font=FONT, bg=BG, fg=FG,
             buttonbackground=BORDER, relief="flat",
             insertbackground=FG,
-        ).pack(side="left", padx=(4, 14))
+        ).pack(side="left", padx=(6, 24))
 
         tk.Label(params_row_2, text="Vmag limit:",
-                 font=FONT, bg=BG, fg=FG_DIM).pack(side="left")
+                 font=FONT, bg=SURFACE, fg=FG_DIM).pack(side="left")
         self.gmax_var = tk.DoubleVar(value=2.5)
         tk.Spinbox(
             params_row_2, from_=1.0, to=8.0, increment=0.5,
             textvariable=self.gmax_var, width=5,
-            font=FONT, bg=SURFACE, fg=FG,
+            font=FONT, bg=BG, fg=FG,
             buttonbackground=BORDER, relief="flat",
             insertbackground=FG,
-        ).pack(side="left", padx=(4, 0))
+        ).pack(side="left", padx=(6, 0))
 
         # ── Options row ───────────────────────────────────────────────────
         opts_row = tk.Frame(body, bg=BG)
-        opts_row.pack(fill="x", pady=(0, 6))
+        opts_row.pack(fill="x", pady=(0, 14))
 
         self.show_plots_var = tk.BooleanVar(value=False)
         tk.Checkbutton(
@@ -276,7 +323,7 @@ class StarCalibrationApp:
             command=self._start_calibration,
             padx=24, pady=10,
         )
-        self.run_btn.pack(pady=(0, 16))
+        self.run_btn.pack(fill="x", pady=(0, 16))
 
         self.progress = ttk.Progressbar(
             body, mode="indeterminate",
@@ -295,35 +342,44 @@ class StarCalibrationApp:
         self.results_outer = tk.Frame(body, bg=BG)
 
         tk.Label(
-            self.results_outer, text="Calibration Results",
-            font=FONT_SB, bg=BG, fg=FG_DIM, anchor="w",
+            self.results_outer, text="RESULTS",
+            font=("Segoe UI", 8, "bold"), bg=BG, fg=FG_DIM, anchor="w",
         ).pack(fill="x", pady=(0, 8))
 
         self.results_box = tk.Frame(
             self.results_outer, bg=SURFACE,
             highlightthickness=1, highlightbackground=BORDER,
-            padx=16, pady=12,
         )
         self.results_box.pack(fill="x")
 
         self.result_labels: dict = {}
-        for key, display_name in [
-            ("score",  "Match score"),
-            ("rms",    "RMS error"),
-            ("zenith", "Zenith pixel"),
-            ("shift",  "Applied shift"),
-        ]:
-            row = tk.Frame(self.results_box, bg=SURFACE)
-            row.pack(fill="x", pady=2)
+        metrics = [
+            ("score",  "Match Score"),
+            ("rms",    "RMS Error"),
+            ("zenith", "Zenith Pixel"),
+            ("shift",  "Applied Shift"),
+        ]
+        for col in range(2):
+            self.results_box.columnconfigure(col, weight=1)
 
-            tk.Label(
-                row, text=f"{display_name}:",
-                font=FONT, bg=SURFACE, fg=FG_DIM,
-                width=14, anchor="w",
-            ).pack(side="left")
+        for i, (key, display_name) in enumerate(metrics):
+            r, c = divmod(i, 2)
+            cell = tk.Frame(self.results_box, bg=SURFACE, padx=18, pady=14)
+            cell.grid(row=r, column=c, sticky="nsew",
+                      padx=(0, 1 if c == 0 else 0),
+                      pady=(0, 1 if r == 0 else 0))
+            # Thin divider lines between cells via 1px border color
+            cell.config(highlightthickness=1 if c == 0 else 0,
+                        highlightbackground=BORDER)
 
-            lbl = tk.Label(row, text="—", font=FONT_MONO, bg=SURFACE, fg=FG, anchor="w")
-            lbl.pack(side="left")
+            tk.Label(cell, text=display_name.upper(),
+                     font=("Segoe UI", 7, "bold"),
+                     bg=SURFACE, fg=FG_DIM, anchor="w").pack(anchor="w")
+
+            lbl = tk.Label(cell, text="—",
+                           font=("Segoe UI", 12, "bold"),
+                           bg=SURFACE, fg=FG, anchor="w")
+            lbl.pack(anchor="w", pady=(4, 0))
             self.result_labels[key] = lbl
 
         btn_row = tk.Frame(self.results_outer, bg=BG)
@@ -625,5 +681,6 @@ class StarCalibrationApp:
 
 
 root = tk.Tk()
+
 app  = StarCalibrationApp(root)
 root.mainloop()
