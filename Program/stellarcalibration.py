@@ -503,7 +503,7 @@ class StarCalibrationApp:
                 plt.plot([catX, srcX], [catY, srcY], color="lime", linewidth=0.8, alpha=0.7)
         plt.plot([], [], color="lime", linewidth=0.8, label="Matched pairs")
 
-        # Label matched catalog stars that have a common name
+        #Label matched catalog stars that have a common name
         for catIdx in range(len(best["predictedXY"])):
             if catIdx in matchedCatalogSet and catIdx < len(catalogNames) and catalogNames[catIdx]:
                 px, py = best["predictedXY"][catIdx]

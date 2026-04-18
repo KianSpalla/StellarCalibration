@@ -74,7 +74,7 @@ def run_calibration(
     img = go.green
 
     #Rotation is for testing only. This should be set to 0 in production
-    rotationAngle = 90
+    rotationAngle = 0
     img = rotateImage(img, rotationAngle, cx, cy)
 
     #Threshold for finding stars
