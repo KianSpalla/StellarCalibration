@@ -32,9 +32,9 @@ def load_cache():
     return np.array(ra_list), np.array(dec_list), np.array(mag_list), names
 
 
-def filter_cache_by_location(meta, gmax=2.5, catalogRadiusDeg = 60.0):
+def filter_cache_by_location(meta, vmag=2.5, catalogRadiusDeg = 60.0):
     ra, dec, mag, names = load_cache()
-    bright = mag < gmax
+    bright = mag < vmag
     ra, dec, mag = ra[bright], dec[bright], mag[bright]
     names = [n for n, b in zip(names, bright) if b]
 

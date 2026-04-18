@@ -1,4 +1,6 @@
 import math
+import os
+import sys
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -87,8 +89,8 @@ class StarCalibrationApp:
         r.geometry(f"{WIN_WIDTH}x{WIN_HEIGHT}+{x}+{y}")
 
         try:
-            import os
-            _ico = os.path.join(os.path.dirname(__file__), "stars.ico")
+            _base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+            _ico = os.path.join(_base, "stars.ico")
             r.iconbitmap(_ico)
         except Exception:
             pass

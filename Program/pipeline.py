@@ -14,7 +14,7 @@ MAIN PIPELINE
 def run_calibration(
     imagePath,
     show_plots=False,
-    gmax=2.5,
+    vmag=2.5,
     pixelMin=5,
     pixelMax=50,
     catalogRadiusDeg=60.0,
@@ -58,7 +58,7 @@ def run_calibration(
     #Grab meta data from GONet Image
     meta = go.meta
     #Grabs stars + planets from cache that appear in the sky at the date, time, and location from the meta data.
-    catalogAltDeg, catalogAzDeg, catalogVmag, catalogNames, planet_data = filter_cache_by_location(meta, gmax=gmax, catalogRadiusDeg=catalogRadiusDeg)
+    catalogAltDeg, catalogAzDeg, catalogVmag, catalogNames, planet_data = filter_cache_by_location(meta, vmag=vmag, catalogRadiusDeg=catalogRadiusDeg)
 
     #Solver that rotates through three angles and gets matches, returns the best rotations
     best = solve_orientation(imgXY, catalogAltDeg, catalogAzDeg, cx, cy, radiusPix, 35, catalogVmag, totalFluxes)
@@ -159,4 +159,4 @@ def run_calibration(
     }
 
 if __name__ == "__main__":
-    run_calibration(r"C:\Users\spall\Desktop\GONet\StellarCalibration\Testing Images\202_250628_063009_1751092241.jpg", show_plots=True, gmax=2.5)
+    run_calibration(r"C:\Users\spall\Desktop\GONet\StellarCalibration\Testing Images\202_250628_063009_1751092241.jpg", show_plots=True, vmag=2.5)
