@@ -56,7 +56,7 @@ def run_calibration(
     imgXY = filter_image_sources_by_radius(imgXY=imgXY, cx=cx, cy=cy, radiusPix=radiusPix, radiusDeg = catalogRadiusDeg)
 
     #Grab meta data from GONet Image
-    #meta = go.meta
+    meta = go.meta
     #Grabs stars + planets from cache that appear in the sky at the date, time, and location from the meta data.
     catalogAltDeg, catalogAzDeg, catalogVmag, catalogNames, planet_data = filter_cache_by_location(meta, vmag=vmag, catalogRadiusDeg=catalogRadiusDeg)
 
