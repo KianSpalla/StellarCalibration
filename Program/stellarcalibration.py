@@ -71,6 +71,7 @@ class StarCalibrationApp:
         self._result: dict | None = None
         self._thumb_ref = None
         self._running = False
+        self._is_fullscreen = False
 
         self._build_window()
         self._build_ui()
@@ -81,6 +82,8 @@ class StarCalibrationApp:
         r.configure(bg=BG)
         r.resizable(True, True)
         r.minsize(420, 580)
+        r.bind("<F11>", self._toggle_fullscreen)
+        r.bind("<Escape>", self._exit_fullscreen)
 
         r.update_idletasks()
         sw, sh = r.winfo_screenwidth(), r.winfo_screenheight()
@@ -124,6 +127,17 @@ class StarCalibrationApp:
             )
         except Exception:
             pass
+
+    def _toggle_fullscreen(self, _event=None):
+        self._is_fullscreen = not self._is_fullscreen
+        self.root.attributes("-fullscreen", self._is_fullscreen)
+        return "break"
+
+    def _exit_fullscreen(self, _event=None):
+        if self._is_fullscreen:
+            self._is_fullscreen = False
+            self.root.attributes("-fullscreen", False)
+            return "break"
 
     def _build_ui(self):
         root = self.root
@@ -517,7 +531,7 @@ class StarCalibrationApp:
         )
 
         self.result_labels["score"].config(
-            text=f"{best['score']} matches",
+            text=f"{best['score']:.2f} matches",
             fg=SUCCESS if best["score"] > 5 else WARN,
         )
         self.result_labels["rms"].config(text=rms_text)

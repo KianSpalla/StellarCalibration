@@ -70,7 +70,7 @@ def run_calibration(
     print(f"Time for pipeline={time.perf_counter() - t0:.3f}")
 
     print(f"catalog_stars={len(catalogAltDeg)}, image_sources={len(imgXY)}")
-    print(f"score={best['score']}, matched={best['matched_count']}, rms_pix={best['rms_pix']:.3f}")
+    print(f"score={best['score']:.2f}, matched={best['matched_count']}, rms_pix={best['rms_pix']:.3f}")
     print(
         "alpha_deg={:.3f}, beta_deg={:.3f}, gamma_deg={:.3f}".format(
             np.rad2deg(best["alpha"]),

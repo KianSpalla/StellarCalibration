@@ -108,7 +108,12 @@ def match_with_local_brightness_tiebreak(img_xy, tree, predicted_xy, source_flux
     keep_img_idx = chosen_img_idx[keep_cat_idx]
     keep_dists = chosen_dist[keep_cat_idx]
 
-    score = int(np.sum(keep_dists <= pixel_tolerance))
+    # Each match contributes 1.0 (perfect) down to 0.0 (at the edge of tolerance)
+    # Previous:
+    # score = int(np.sum(keep_dists <= pixel_tolerance))
+    within = keep_dists <= pixel_tolerance
+    per_match_scores = 1.0 - (keep_dists[within] / pixel_tolerance)
+    score = float(np.sum(per_match_scores))
     rms_pix = float(np.sqrt(np.mean(keep_dists**2))) if len(keep_dists) > 0 else np.nan
 
     return score, keep_cat_idx, keep_img_idx, keep_dists, rms_pix
